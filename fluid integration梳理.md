@@ -46,8 +46,9 @@
     - 实例`using Integration2ndHalfInnerNoRiemann = Integration2ndHalf<Inner<>, NoRiemannSolver>;`
     - 实例`using Integration2ndHalfInnerDissipativeRiemann = Integration2ndHalf<Inner<>, DissipativeRiemannSolver>;`
   - 模板`Integration2ndHalf<Contact<Wall>, RiemannSolverType>`。使用墙面平均速度与法向，镜像速度参与散度与耗散计算。
-  - 模板`Integration2ndHalf<Contact<>, ...>`。与其它流体体的平均速度与速度跳跃计算`drho_dt`与耗散。
+  - 模板`Integration2ndHalf<Contact<>, RiemannSolverType>`。与其它流体体的平均速度与速度跳跃计算`drho_dt`与耗散。
   - 壁面+流体复合模板`using Integration2ndHalfWithWall = ComplexInteraction<Integration2ndHalf<Inner<>, Contact<Wall>>, RiemannSolverType>;`。
     - 实例`using Integration2ndHalfWithWallNoRiemann = Integration2ndHalfWithWall<NoRiemannSolver>;`
     - 实例`using Integration2ndHalfWithWallRiemann = Integration2ndHalfWithWall<AcousticRiemannSolver>;`
   - 壁面+流体+多相实例`using MultiPhaseIntegration2ndHalfWithWallRiemann = ComplexInteraction<Integration2ndHalf<Inner<>, Contact<>, Contact<Wall>>, AcousticRiemannSolver>;`。
+
