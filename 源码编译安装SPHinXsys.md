@@ -17,7 +17,7 @@ mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/lapack-3.8.0 ..
 make -j
-make install
+sudo make install
 
 # 环境变量
 export LD_LIBRARY_PATH=/opt/sphinxsys-soft/lapack-3.8.0/lib64:$LD_LIBRARY_PATH
@@ -50,7 +50,13 @@ cmake -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/oneTBB-2022.3.0 \
       -DCMAKE_CXX_FLAGS="-Wno-stringop-truncation -Wno-stringop-overflow -Wno-error=stringop-truncation -Wno-error=stringop-overflow" \
       -DCMAKE_C_FLAGS="-Wno-stringop-truncation -Wno-stringop-overflow -Wno-error=stringop-truncation -Wno-error=stringop-overflow" ..
 make -j
-sudo make install
+make install
+# 一键安装
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/oneTBB-2022.3.0 \
+      -DCMAKE_BUILD_TYPE=RELEASE \
+      -DCMAKE_CXX_FLAGS="-Wno-stringop-truncation -Wno-stringop-overflow -Wno-error=stringop-truncation -Wno-error=stringop-overflow" \
+      -DCMAKE_C_FLAGS="-Wno-stringop-truncation -Wno-stringop-overflow -Wno-error=stringop-truncation -Wno-error=stringop-overflow" .. && make -j && make install
 ```
 
 ## 安装googletest-1.17.0
@@ -61,16 +67,21 @@ cd build
 cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/googletest-1.17.0 ..
 make -j
 make install
+# 一键安装
+cd build
+cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/googletest-1.17.0 .. && make -j && make install
 ```
 
 ## 安装boost-1.88.0
 
 ```bash
 ./bootstrap.sh --prefix=/opt/sphinxsys-soft/Boost-1.88.0 --with-libraries=all
-./b2 install -j40
+sudo ./b2 install -j44 # 注意，root用户的gcc版本可能是4.8.5，建议先切换为root，再source gcc-13.4，最后安装
 ```
 
 ## 安装Simbody-3.7
+
+依赖于之前安装的库，可以先source一下环境变量。
 
 ```bash
 mkdir build
@@ -78,6 +89,9 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/Simbody-3.7 ..
 make -j
 make install
+# 一键安装
+cd build
+cmake -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/Simbody-3.7 .. && make -j && make install
 ```
 
 ## 安装pybind11
@@ -97,6 +111,9 @@ cd build
 cmake -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/eigen-3.4.0 ..
 make -j
 make install
+# 一键安装
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/eigen-3.4.0 .. && make -j && make install
 ```
 
 ## spdlog-1.16.0
@@ -107,6 +124,9 @@ cd build
 cmake -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/spdlog-1.16.0 ..
 make -j
 make install
+# 一键安装
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=/opt/sphinxsys-soft/spdlog-1.16.0 .. && make -j && make install
 ```
 
 # 安装SPHinXsys
@@ -130,7 +150,10 @@ export spdlog_DIR=/opt/sphinxsys-soft/spdlog-1.16.0
 ```bash
 source /opt/sphinxsys-soft/sphinxsys.env.sh
 mkdir build && cd build
+# no SYCL
 cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache -S ..
+# SYCL
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DSPHINXSYS_USE_SYCL=ON -DSPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda -S ..
 make -j40 # 不建议占用全部核心
 ```
 
