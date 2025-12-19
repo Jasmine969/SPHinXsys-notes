@@ -1,3 +1,5 @@
+版本是GitHub master分支。
+
 # AcousticTimeStep
 
 在fluid_time_step.h中可以看到，这个类采用的归约操作是全局最大化：`LocalDynamicsReduce<ReduceMax>`。
@@ -11,7 +13,7 @@ Real AcousticTimeStep::reduce(size_t index_i, Real dt)
 }
 ```
 
-可以看到被归约的变量是$c+|v|_i$，也即$c+|v|_i$。疑问：这两个单位为什么不同？
+可以看到被归约的变量是$c+|v|_i$，也即$c+|v|_i$。
 
 ```cpp
 Real AcousticTimeStep::outputResult(Real reduced_value)
@@ -49,3 +51,4 @@ $$
 \Delta t_\mathrm{ad}=\mathrm{CFL_{ad}}\min\left\{\frac{h_\mathrm{min}}{|v|_\mathrm{max}},\sqrt{\frac{h_\mathrm{min}}{4|a|_\mathrm{max}}},\frac{h_\mathrm{min}}{|v|_\mathrm{ref}},\frac{h_\mathrm{min}^2}{\nu}\right\}
 $$
 这里$\nu$是运动粘度。
+

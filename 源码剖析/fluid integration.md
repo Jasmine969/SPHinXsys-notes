@@ -1,7 +1,13 @@
 # 概述
 
-这两个文件共同定义并实现弱可压流体（WCSPH）的两阶段时间推进算子：第一半步（动量/压力力）与第二半步（连续性/密度）。
-`fluid_integration.h` 声明类与模板类型，`fluid_integration.hpp` 提供具体实现。
+fluid_integration定义并实现了弱可压流体（WCSPH）的两阶段时间推进算子：第一半步（动量/压力力）与第二半步（连续性/密度）。
+`fluid_integration.h`声明类与模板类型，`fluid_integration.hpp`提供具体实现。
+
+# 辅助类
+
+`DataDelegateContact`：定义在`base_particle_dynamics.h`。接受`BaseContactRelation`对象作为构造函数参数。具有`contact_relation_`成员，提取其所有接触对象、接触对象的粒子、接触对象的配置。
+
+`InteractionWithWall`：定义在`base_fluid_dynamics.h`。类模板。继承于`BaseInteractionType<DataDelegateContact>`。接受`BaseContactRelation`对象`contact_relation_`作为构造函数参数。先用`contact_relation_`初始化基类。在构造函数体中，获取每一个contact body的`base_material_`，将其dynamic_cast为Solid类型对象，然后提取其平均速度、加速度、法方向、体积。
 
 # 核心类与关系
 
@@ -14,11 +20,9 @@
   - 用于初始化流体粒子的 Position、Velocity。
   
 - `ContinuumVolumeUpdate : LocalDynamics`
-  
   - 根据质量和密度更新体积 Vol = Mass / rho。
   
 - `BaseIntegration<DataDelegationType> : LocalDynamics, DataDelegationType`
-  
   - 通用基类，绑定关系（`Inner/Contact`），抓取/注册通用状态：
     - `Vol, rho, mass, p, drho_dt, pos, vel, force, force_prior`
     - 引用材料 Fluid。
@@ -29,7 +33,7 @@
     - 实例`using Integration1stHalfInnerNoRiemann = Integration1stHalf<Inner<>, NoRiemannSolver, NoKernelCorrection>;`
     - 实例`using Integration1stHalfInnerRiemann = Integration1stHalf<Inner<>, AcousticRiemannSolver, NoKernelCorrection>;`
     - 实例`using Integration1stHalfCorrectionInnerRiemann = Integration1stHalf<Inner<>, AcousticRiemannSolver, LinearGradientCorrection>;`
-  - 模板`Integration1stHalf<Contact<Wall>, RiemannSolverType, KernelCorrectionType>`。处理墙接触，基于墙面平均加速度与镜像压力 `p_j_in_wall`。
+  - 模板`Integration1stHalf<Contact<Wall>, RiemannSolverType, KernelCorrectionType>`。继承于`InteractionWithWall<BaseIntegration>`。处理墙接触，基于墙面平均加速度与镜像压力 `p_j_in_wall`。
   - `Integration1stHalf<Contact<>, RiemannSolverType, KernelCorrectionType>`。处理与其它流体体的接触，逐接触体保存各自的 `KernelCorrection` 与 `RiemannSolver`。
   - 壁面+流体复合模板`using Integration1stHalfWithWall = ComplexInteraction<Integration1stHalf<Inner<>, Contact<Wall>>, RiemannSolverType, KernelCorrectionType>;`。有内部交互，也有流体与壁面交互。
     - 实例`using Integration1stHalfWithWallNoRiemann = Integration1stHalfWithWall<NoRiemannSolver, NoKernelCorrection>;`。

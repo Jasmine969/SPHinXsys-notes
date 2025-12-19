@@ -1,0 +1,2 @@
+- 模板`DensitySummation<Base, DataDelegationType>`：所有`DensitySummation`的基类。是`LocalDynamics`和`DataDelegationType`的公有继承。
+- 实例`DensitySummation<Inner<Base>>`：所有Inner版本的基类

@@ -1,3 +1,5 @@
+官方教程的案例已经过时，与最新版的SPHinXsys不匹配了。因此我写了最新版的教程系列，欢迎关注。本次讲第一个案例——二维溃坝（test_2d_dambreak）。
+
 # 命令行参数
 
 这些参数定义在`sph_system.cpp`中：
@@ -15,13 +17,13 @@
 
 ## relax
 
-指定是否要粒子松弛，在复杂几何中使用，用于生成贴体的粒子初始分布。如果需要，参数为`true/yes/on/1`；否则为`false/no/off/0`，不区分大小写。
+指定是否要粒子松弛，在复杂几何中使用，用于生成贴体的粒子初始分布（不进行模拟）。如果需要，参数为`true/yes/on/1`；否则为`false/no/off/0`，不区分大小写。
 
 默认值：`false`。
 
 ## reload
 
-指定是否要从输入文件中重新加载松弛的粒子。
+指定是否要从输入文件中重新加载松弛的粒子。如果终端提示`Error in load file: Error=XML_ERROR_FILE_NOT_FOUND ErrorID=3 (0x3)`，先运行`--relax`，再运行`reload`。
 
 默认值：`false`。
 
@@ -72,9 +74,11 @@ Real U_ref = 2.0 * sqrt(gravity_g * LH); /**< Characteristic velocity. */
 Real c_f = 10.0 * U_ref;                 /**< Reference sound speed. */
 ```
 
+# 壁面几何
+
 矩形几何创建时默认以原点为中心。通过Transform命令，把左下角平移到原点位置。
 
-![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251205152139.png)
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251205152139.png)创建壁面采取了大矩形减去小矩形的方式。
 
 ```cpp
 class WallBoundary : public ComplexShape
@@ -82,17 +86,19 @@ class WallBoundary : public ComplexShape
   public:
     explicit WallBoundary(const std::string &shape_name) : ComplexShape(shape_name)
     {
-        // WallBoundary继承于ComplexShape，后者又继承于BinaryShape，BinaryShape具有add成员函数
-        // add成员函数将在其sub_shape_ptrs_keeper_（储存unique_ptr<Shape*>的vector）添加一个指向GeometricShapeBox对象的Shape指针
-        // 然后在sub_shapes_and_ops_（储存pair<Shape *, ShapeBooleanOps>的vector）中添加一个pair：(上面创建的Shape指针,add)
-        // 创建指向GeometricShapeBox对象的Shape指针时，使用的参数为Transform(outer_wall_translation)和outer_wall_halfsize，其中前者调用了构造函数explicit BaseTransform::BaseTransform(const VecType &translation)表示平移变换，后者表示盒子一半尺寸，将传入GeometricBox的构造函数
         add<GeometricShapeBox>(Transform(outer_wall_translation), outer_wall_halfsize);
         subtract<GeometricShapeBox>(Transform(inner_wall_translation), inner_wall_halfsize);
     }
 };
 ```
 
+注意，这里原点O不在流体域，也不在固体域，而是在流体与固体中间的位置。这个原因到`generateParticles`时会讲。
+
+`add`和`subtract`这两行代码看着挺难理解的。我以`add`为例，讲讲它在底层在做什么。`WallBoundary`继承于`ComplexShape`，后者又继承于`BinaryShape`，`BinaryShape`具有`add`成员函数。`add`成员函数将在其`sub_shape_ptrs_keeper_`（储存`unique_ptr<Shape*>`的vector）添加一个指向`GeometricShapeBox`对象的`Shape`指针，然后在`sub_shapes_and_ops_`（储存`pair<Shape *, ShapeBooleanOps>`的vector）中添加一个`pair`：`(上面创建的Shape指针,add)`。创建指向`GeometricShapeBox`对象的`Shape`指针时，使用的参数为`Transform(outer_wall_translation)`和`outer_wall_halfsize`，其中前者调用了构造函数`explicit BaseTransform::BaseTransform(const VecType &translation)`表示平移变换，后者表示盒子一半尺寸，将传入`GeometricBox`的构造函数。
+
 # main函数
+
+## 定义系统
 
 ```cpp
     // 定义二维盒子边界，使用左下角（坐标最小的）和右上角（坐标最大的）
@@ -100,6 +106,8 @@ class WallBoundary : public ComplexShape
     // 定义系统，使用定义好的系统边界与粒子间距
     SPHSystem sph_system(system_domain_bounds, particle_spacing_ref);
 ```
+
+## 定义body
 
 在SPHinXsys中，定义一个body有以下5种方式：
 
@@ -114,16 +122,34 @@ SPHBody(SPHSystem &sph_system, SharedPtr<Shape> shape_ptr);
 定义water_block时使用的是第二个，定义SolidBody对象时使用的是第五个。当没有传入名字时，默认使用shape的名字（见base_body.cpp的20行和32行）。
 
 ```cpp
-    FluidBody water_block(sph_system, initial_water_block);
+	GeometricShapeBox initial_water_block(Transform(water_block_translation), water_block_halfsize, "WaterBody");
+	FluidBody water_block(sph_system, initial_water_block);
 	// 定义材料，rho0f和c_f是初始化WeaklyCompressibleFluid的参数
     water_block.defineMaterial<WeaklyCompressibleFluid>(rho0_f, c_f);
-	// 生成颗粒，模板参数中第一个是颗粒类型，第二个是
+	// 生成颗粒，模板参数中第一个是颗粒类型，第二个是创建风格
     water_block.generateParticles<BaseParticles, Lattice>();
 
     SolidBody wall_boundary(sph_system, makeShared<WallBoundary>("WallBoundary"));
     wall_boundary.defineMaterial<Solid>();
     wall_boundary.generateParticles<BaseParticles, Lattice>();
 ```
+
+注生成`water_block`时，我们传入的是在栈上定义的`initial_water_block`。但是在生成`wall_boundary`时，我们传入的却是shared pointer。为什么这里使用了不同的构造方式呢？按照[从源码到范式：SPHinXsys 的RAII所有权设计与指针策略](../源码剖析/从源码到范式：SPHinXsys 的RAII所有权设计与指针策略.md)一文所说，这里其实传入shared pointer是最合适的，符合RAII原则。需要注意的是，以下定义body的写法是不允许的：
+
+```cpp
+SolidBody wall_boundary(sph_system, WallBoundary("WallBoundary"));
+```
+
+虽然看着简单，只需要一行代码就可以创建，但是这行代码会在编译期报错。理由是`WallBoundary("WallBoundary")`是一个临时的对象，更准确来说是个右值，我们不能把一个左值引用（`Shape &shape`）绑定到一个右值上。因此，上面的代码应该改为下面这样，以保证`wall_boundary_`存活至main函数结束：
+
+```cpp
+WallBoundary wall_boundary_("WallBoundary");
+SolidBody wall_boundary(sph_system, wall_boundary_);
+```
+
+我们使用`generateParticles<BaseParticles, Lattice>()`来生成颗粒。它会调用`ParticleGenerator<BaseParticles, Lattice>`的构造函数。`Lattice`是基于网格生成粒子。网格线与边界线是重合的，而粒子被放在网格的中心位置。所以，粒子位置总是会比指定边界多或少半个粒子间距。而这**恰好避免了壁面与流体的粒子重叠**。
+
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251216121448.png)
 
 定义观测点，大概是为了回归测试的。
 
@@ -133,7 +159,9 @@ SPHBody(SPHSystem &sph_system, SharedPtr<Shape> shape_ptr);
     fluid_observer.generateParticles<ObserverParticles>(observation_location);
 ```
 
-定义拓扑关系。类似于LAMMPS中的`pair_coeff I J`，指定哪两类粒子之间要建立邻居表。`ComplexRelation`不是为了建立邻居表，而是为了更新配置。
+## 定义关系
+
+类似于LAMMPS中的`pair_coeff I J`，指定哪两类粒子之间要建立邻居表。`ComplexRelation`不是为了建立邻居表，而是为了更新配置。
 
 ```cpp
     //----------------------------------------------------------------------
@@ -151,6 +179,14 @@ SPHBody(SPHSystem &sph_system, SharedPtr<Shape> shape_ptr);
     ComplexRelation water_wall_complex(water_block_inner, water_wall_contact);
 ```
 
+注意，这里的关系不是双向的（对称的），而是单向的。例如当前的`water_wall_contact`表示的是水体要和什么body建立邻居表，主体是水体，这个`water_wall_contact`只能用于水体的积分。我们不能把`water_wall_contact`定义为以下形式：
+
+```cpp
+ContactRelation water_wall_contact(wall_boundary, {&water_block});
+```
+
+上面这种关系以壁面为主体，它在壁面可变形的场景中是有用的，但是在这里没用。
+
 ## 规定数值方法
 
 `SimpleDynamics`是一个不考虑粒子间相互作用的简单粒子动力学算法模板类。`NormalDirectionFromBodyShape` 是局部动力学类，用于从物体形状计算粒子的法向方向。这确保了墙体边界的每个粒子都有正确的法向量，这对于后续的流固耦合计算（如Riemann求解器）至关重要，用于正确处理流体与墙体的相互作用。
@@ -166,13 +202,13 @@ SPHBody(SPHSystem &sph_system, SharedPtr<Shape> shape_ptr);
     // boundary condition and other constraints should be defined.
     //----------------------------------------------------------------------
     Gravity gravity(Vecd(0.0, -gravity_g));
-    c<GravityForce<Gravity>> constant_gravity(water_block, gravity);
+    SimpleDynamics<GravityForce<Gravity>> constant_gravity(water_block, gravity);
     SimpleDynamics<NormalDirectionFromBodyShape> wall_boundary_normal_direction(wall_boundary);
 ```
 
 内壁面法向量朝内，外壁面法向量朝外，对于奇数层壁面，中间层的法向量是朝内的，如图所示：
 
-![](.\normal-direction.png)
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251215102145.png)
 
 `Dynamics1Level`是最复杂的粒子动力学算法，通常是流体动力学或固体动力学算法的具体实现，包含完整的三步骤初始化`initialization(i, dt)`、粒子间相互作用`interaction(i, dt)`、状态更新`update(i, dt)`。
 
@@ -367,7 +403,7 @@ $$
 
 循环分为三层。外层循环把整个模拟分成了多个output周期，周期长度就是`output_interval`。中层和内层循环由Dual-criteria time stepping控制，具体来说， 中层循环的时间步长为对流时间步长（$\Delta t_\mathrm{ad}$），内层循环的时间步长为声学时间步长（$\Delta t_\mathrm{ac}$）。内层循环的周期长度是对流时间步长。
 
-![](./main-loop-dambreak.png)
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251218221548.png)
 
 ### 外循环
 
@@ -391,7 +427,13 @@ $$
 
 `integration_time`记录了每一轮output已经进行了多久，当时间到达`output_interval`时，跳出中层循环，保存粒子状态，然后进入下一轮output。
 
-感觉这里`TickCount t2 = TickCount::now();`应该是调到上面一行，以忽略IO的时间消耗。
+感觉这里`TickCount t2 = TickCount::now();`应该是调到上面一行，以忽略IO的时间消耗，作者可能是笔误：
+
+```cpp
+        TickCount t2 = TickCount::now();
+		body_states_recording.writeToFile();
+        TickCount t3 = TickCount::now();
+```
 
 ### 中循环
 
@@ -442,7 +484,7 @@ $$
 
 ```
 
-接着在屏幕上输出相关信息。
+接着在每隔一段时间屏幕上输出相关信息、将观测数据写入文件、保存续算文件。
 
 ```cpp
             /** Update cell linked list and configuration. */
@@ -457,4 +499,61 @@ $$
             interval_updating_configuration += TickCount::now() - time_instance;
         }
 ```
+
+最后，每隔100步执行一次例子排序。更新流体的CLL，更新邻居表。这一过程的用时记录在`interval_updating_configuration`。
+
+### 内循环
+
+```cpp
+            while (relaxation_time < advection_dt)
+            {
+                /** inner loop for dual-time criteria time-stepping.  */
+                acoustic_dt = fluid_acoustic_time_step.exec();
+                fluid_pressure_relaxation.exec(acoustic_dt);
+                fluid_density_relaxation.exec(acoustic_dt);
+                relaxation_time += acoustic_dt;
+                integration_time += acoustic_dt;
+                physical_time += acoustic_dt;
+            }
+```
+
+内循环先计算了声学时间步长。然后分别进行了动量方程和连续性方程的更新。最后更新了中层循环的时间、外循环的时间和物理时间.
+
+## 打印各部分用时
+
+```cpp
+    TickCount t4 = TickCount::now();
+
+    TimeInterval tt;
+    tt = t4 - t1 - interval;
+    std::cout << "Total wall time for computation: " << tt.seconds()
+              << " seconds." << std::endl;
+    std::cout << std::fixed << std::setprecision(9) << "interval_computing_time_step ="
+              << interval_computing_time_step.seconds() << "\n";
+    std::cout << std::fixed << std::setprecision(9) << "interval_computing_fluid_pressure_relaxation = "
+              << interval_computing_fluid_pressure_relaxation.seconds() << "\n";
+    std::cout << std::fixed << std::setprecision(9) << "interval_updating_configuration = "
+              << interval_updating_configuration.seconds() << "\n";
+```
+
+主循环结束后，打印总用时与各部分用时。
+
+## 回归测试
+
+```cpp
+    if (sph_system.GenerateRegressionData())
+    {
+        write_water_mechanical_energy.generateDataBase(1.0e-3);
+        write_recorded_water_pressure.generateDataBase(1.0e-3);
+    }
+    else if (sph_system.RestartStep() == 0)
+    {
+        write_water_mechanical_energy.testResult();
+        write_recorded_water_pressure.testResult();
+    }
+    return 0;
+};
+```
+
+如果用户指定了`--regression yes`，则生成回归测试数据集；如果没有，并且是从零时刻开始算的，则进行回归测试。
 
