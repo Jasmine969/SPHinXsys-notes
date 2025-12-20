@@ -441,6 +441,34 @@ void channel_flow_shell(...)
 
 # 定义数值方法
 
+```cpp
+    //	Define the main numerical methods used in the simulation.
+    //	Note that there may be data dependence on the constructors of these methods.
+    //----------------------------------------------------------------------
+    /** Pressure relaxation using Verlet time stepping. */
+    /** Here, we do not use Riemann solver for pressure as the flow is viscous. */
+    Dynamics1Level<fluid_dynamics::Integration1stHalfWithWallRiemann> pressure_relaxation(water_block_inner, water_block_contact);
+    Dynamics1Level<fluid_dynamics::Integration2ndHalfWithWallNoRiemann> density_relaxation(water_block_inner, water_block_contact);
+    /** Evaluation of density by summation approach. */
+    InteractionWithUpdate<fluid_dynamics::DensitySummationComplex> update_density_by_summation(water_block_inner, water_block_contact);
+
+```
+
+fluid integration与二维溃坝一致，在此不赘。密度求和采用的是`DensitySummationComplex`，它实际上是`BaseDensitySummationComplex<Inner<>, Contact<>>;`。二维溃坝中采用的是`DensitySummationComplexFreeSurface`。因为这里没有自由表面，所以采用了最基础的密度求和方式。
+
+```cpp
+    /** Time step size without considering sound wave speed. */
+    ReduceDynamics<fluid_dynamics::AdvectionViscousTimeStep> get_fluid_advection_time_step_size(water_block, 1.5 * U_f);
+    /** Time step size with considering sound wave speed. */
+    ReduceDynamics<fluid_dynamics::AcousticTimeStep> get_fluid_time_step_size(water_block);
+```
+
+时间步计算和二维溃坝基本相似，只不过对流时间步计算加入了对黏度的考虑，变成以下形式：
+$$
+\Delta t_\mathrm{ad}=\mathrm{CFL_{ad}}\min\left\{\frac{h_\mathrm{min}}{|v|_\mathrm{max}},\sqrt{\frac{h_\mathrm{min}}{4|a|_\mathrm{max}}},\frac{h_\mathrm{min}}{|v|_\mathrm{ref}},\frac{h_\mathrm{min}^2}{\nu}\right\}
+$$
+
+
 # 观测数据与模拟验证
 
 ```cpp
