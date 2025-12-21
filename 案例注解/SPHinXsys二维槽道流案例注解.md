@@ -468,6 +468,17 @@ $$
 \Delta t_\mathrm{ad}=\mathrm{CFL_{ad}}\min\left\{\frac{h_\mathrm{min}}{|v|_\mathrm{max}},\sqrt{\frac{h_\mathrm{min}}{4|a|_\mathrm{max}}},\frac{h_\mathrm{min}}{|v|_\mathrm{ref}},\frac{h_\mathrm{min}^2}{\nu}\right\}
 $$
 
+```cpp
+    InteractionWithUpdate<fluid_dynamics::TransportVelocityCorrectionComplex<AllParticles>> transport_correction(water_block_inner, water_block_contact);
+```
+
+类似于particle shifting，传递速度修正是另一种使得粒子均匀分布的技术，可以缓解拉伸不稳定性的问题。这里采用的`TransportVelocityCorrectionComplex<AllParticles>`是一种较基础的类型，它是`BaseTransportVelocityCorrectionComplex<SingleResolution, NoLimiter, LinearGradientCorrection, AllParticles>`的别名，也即它采用的是单一分辨率、没有限制修正幅度、线性核梯度修正、对所有颗粒执行。
+
+```cpp
+    InteractionWithUpdate<fluid_dynamics::ViscousForceWithWall> viscous_acceleration(water_block_inner, water_block_contact);
+```
+
+`ViscousForceWithWall`是最常见的“流体粘性+无滑移壁面”组合，它展开为`ComplexInteraction<ViscousForce<Inner<>, Contact<Wall>>, FixedViscosity, NoKernelCorrection>`，也即它采用的是常数黏度、没有核梯度修正。
 
 # 观测数据与模拟验证
 
