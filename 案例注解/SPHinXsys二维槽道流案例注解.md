@@ -167,7 +167,7 @@ void channel_flow_shell(...) {
 }
 ```
 
-程序设计了一个类`InflowVelocity`。它的构造函数需要一个`BoundaryConditionType`对象`boundary_condition`作为参数，从`boundary_condition`中，先获取`aligned_box_`，再获取后者的`halfsize`。在main函数调用中可以看出，此aligned box就是`AlignedBox(xAxis, Transform(Vec2d(buffer_translation)), buffer_halfsize)`，它就是inflow buffer。`AlignedBox`类与`GeometricBox`类很像，只不过`AlignedBox`多了一个对齐轴（alignment axis），所有“上/下边界、周期映射、近边界判断”等操作都沿着这个对齐轴来做。
+程序设计了一个类`InflowVelocity`。它的构造函数需要一个`BoundaryConditionType`对象`boundary_condition`作为参数，从`boundary_condition`中，先获取`aligned_box_`，再获取后者的`halfsize`。在main函数调用中可以看出，此aligned box就是`AlignedBox(xAxis, Transform(Vec2d(buffer_translation)), buffer_halfsize)`，它就是inflow buffer。`xAxis`是定义在`base_data_type.h`中的常量，类似还有`yAxis`和`zAxis`。`AlignedBox`类与`GeometricBox`类很像，只不过`AlignedBox`多了一个对齐轴（alignment axis），所有“上/下边界、周期映射、近边界判断”等操作都沿着这个对齐轴来做。
 
 `InflowVelocity`的函数调用运算符被重载了，因此它实际上会生成一个函数对象。它有三个形参：位置、速度、当前时间。`u_ave`是随时间变化的平均速度，形式如下：
 $$
@@ -451,7 +451,6 @@ void channel_flow_shell(...)
     Dynamics1Level<fluid_dynamics::Integration2ndHalfWithWallNoRiemann> density_relaxation(water_block_inner, water_block_contact);
     /** Evaluation of density by summation approach. */
     InteractionWithUpdate<fluid_dynamics::DensitySummationComplex> update_density_by_summation(water_block_inner, water_block_contact);
-
 ```
 
 fluid integration与二维溃坝一致，在此不赘。密度求和采用的是`DensitySummationComplex`，它实际上是`BaseDensitySummationComplex<Inner<>, Contact<>>;`。二维溃坝中采用的是`DensitySummationComplexFreeSurface`。因为这里没有自由表面，所以采用了最基础的密度求和方式。
@@ -479,6 +478,59 @@ $$
 ```
 
 `ViscousForceWithWall`是最常见的“流体粘性+无滑移壁面”组合，它展开为`ComplexInteraction<ViscousForce<Inner<>, Contact<Wall>>, FixedViscosity, NoKernelCorrection>`，也即它采用的是常数黏度、没有核梯度修正。
+
+## 周期性边界
+
+### 周期性边界的定义
+
+以下两行代码定义了x方向上的周期性边界条件。`PeriodicAlongAxis`定义了一个周期性盒子，其构造函数第一个参数是bounding box，第二个参数是在哪个方向上采用周期性边界。`PeriodicConditionUsingCellLinkedList`定义了周期性边界相关的CLL。注意这里周期边界是按照单一轴来配置的，如果想在多个轴上均采用周期边界，需要写多个`PeriodicAlongAxis`+`PeriodicConditionUsingCellLinkedList`。
+
+```cpp
+    /** Periodic BCs in x direction. */
+    PeriodicAlongAxis periodic_along_x(water_block.getSPHBodyBounds(), xAxis);
+    PeriodicConditionUsingCellLinkedList periodic_condition(water_block, periodic_along_x);
+```
+
+### 周期性边界的初始化
+
+先初始化CLL，再世家周期性边界条件，最后初始化系统配置（包括建立邻居表）。
+
+```cpp
+    //----------------------------------------------------------------------
+    //	Prepare the simulation with cell linked list, configuration
+    //	and case specified initial condition if necessary.
+    //----------------------------------------------------------------------
+    /** initialize cell linked lists for all bodies. */
+    sph_system.initializeSystemCellLinkedLists();
+    /** periodic condition applied after the mesh cell linked list build up
+     * but before the configuration build up. */
+    periodic_condition.update_cell_linked_list_.exec();
+    /** initialize configurations for all bodies. */
+    sph_system.initializeSystemConfigurations();
+```
+
+### 周期性边界的执行
+
+先bounding（把越界粒子搬回周期域内）、然后更新链表、再插入ghost（边界附近往CLL插入ghost粒子），最后更新邻居表。
+
+```cpp
+    while(...) {
+        ...
+        while(...) {
+            ...
+            /** Water block configuration and periodic condition. */
+            periodic_condition.bounding_.exec();
+            if (number_of_iterations % 100 == 0 && number_of_iterations != 1)
+            {
+                particle_sorting.exec();
+            }
+            water_block.updateCellLinkedList();
+            periodic_condition.update_cell_linked_list_.exec();
+            water_block_complex.updateConfiguration();
+        }
+
+    }
+```
 
 # 观测数据与模拟验证
 
@@ -594,3 +646,4 @@ int main(int ac, char *av[])
 }
 ```
 
+ 
