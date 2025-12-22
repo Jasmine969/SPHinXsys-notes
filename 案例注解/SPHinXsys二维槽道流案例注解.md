@@ -441,6 +441,8 @@ void channel_flow_shell(...)
 
 # 定义数值方法
 
+## fluid integration
+
 ```cpp
     //	Define the main numerical methods used in the simulation.
     //	Note that there may be data dependence on the constructors of these methods.
@@ -449,11 +451,20 @@ void channel_flow_shell(...)
     /** Here, we do not use Riemann solver for pressure as the flow is viscous. */
     Dynamics1Level<fluid_dynamics::Integration1stHalfWithWallRiemann> pressure_relaxation(water_block_inner, water_block_contact);
     Dynamics1Level<fluid_dynamics::Integration2ndHalfWithWallNoRiemann> density_relaxation(water_block_inner, water_block_contact);
+```
+
+fluid integration与二维溃坝一致，在此不赘。
+
+## density summation
+
+```cpp
     /** Evaluation of density by summation approach. */
     InteractionWithUpdate<fluid_dynamics::DensitySummationComplex> update_density_by_summation(water_block_inner, water_block_contact);
 ```
 
-fluid integration与二维溃坝一致，在此不赘。密度求和采用的是`DensitySummationComplex`，它实际上是`BaseDensitySummationComplex<Inner<>, Contact<>>;`。二维溃坝中采用的是`DensitySummationComplexFreeSurface`。因为这里没有自由表面，所以采用了最基础的密度求和方式。
+密度求和采用的是`DensitySummationComplex`，它实际上是`BaseDensitySummationComplex<Inner<>, Contact<>>;`。二维溃坝中采用的是`DensitySummationComplexFreeSurface`。因为这里没有自由表面，所以采用了最基础的密度求和方式。
+
+## 时间步控制
 
 ```cpp
     /** Time step size without considering sound wave speed. */
@@ -467,17 +478,21 @@ $$
 \Delta t_\mathrm{ad}=\mathrm{CFL_{ad}}\min\left\{\frac{h_\mathrm{min}}{|v|_\mathrm{max}},\sqrt{\frac{h_\mathrm{min}}{4|a|_\mathrm{max}}},\frac{h_\mathrm{min}}{|v|_\mathrm{ref}},\frac{h_\mathrm{min}^2}{\nu}\right\}
 $$
 
-```cpp
-    InteractionWithUpdate<fluid_dynamics::TransportVelocityCorrectionComplex<AllParticles>> transport_correction(water_block_inner, water_block_contact);
-```
+## Transport Velocity Correction
 
 类似于particle shifting，传递速度修正是另一种使得粒子均匀分布的技术，可以缓解拉伸不稳定性的问题。这里采用的`TransportVelocityCorrectionComplex<AllParticles>`是一种较基础的类型，它是`BaseTransportVelocityCorrectionComplex<SingleResolution, NoLimiter, LinearGradientCorrection, AllParticles>`的别名，也即它采用的是单一分辨率、没有限制修正幅度、线性核梯度修正、对所有颗粒执行。
 
 ```cpp
-    InteractionWithUpdate<fluid_dynamics::ViscousForceWithWall> viscous_acceleration(water_block_inner, water_block_contact);
+    InteractionWithUpdate<fluid_dynamics::TransportVelocityCorrectionComplex<AllParticles>> transport_correction(water_block_inner, water_block_contact);
 ```
 
+## 黏性力
+
 `ViscousForceWithWall`是最常见的“流体粘性+无滑移壁面”组合，它展开为`ComplexInteraction<ViscousForce<Inner<>, Contact<Wall>>, FixedViscosity, NoKernelCorrection>`，也即它采用的是常数黏度、没有核梯度修正。
+
+```cpp
+	InteractionWithUpdate<fluid_dynamics::ViscousForceWithWall> viscous_acceleration(water_block_inner, water_block_contact);
+```
 
 ## 周期性边界
 
@@ -507,6 +522,7 @@ $$
     periodic_condition.update_cell_linked_list_.exec();
     /** initialize configurations for all bodies. */
     sph_system.initializeSystemConfigurations();
+    water_block_complex.updateConfiguration(); // 可以删？？？？？？
 ```
 
 ### 周期性边界的执行
@@ -531,6 +547,72 @@ $$
 
     }
 ```
+
+## 粒子排序
+
+```cpp
+    //	Define the configuration related particles dynamics.
+    //----------------------------------------------------------------------
+    ParticleSorting particle_sorting(water_block);
+```
+
+与二维溃坝类似，这里只对`water_block`的粒子进行了排序。为什么我们没有对壁面进行粒子排序呢？排序是为了解决粒子在计算域里大范围移动（多是对流迁移所致）导致的邻域搜索/Cell Linked List退化，而这个问题在多数案例里主要出现在流体上，壳/壁这种结构体通常不会同样严重。且不说本例中壁面是固定不动的，就算是许多壁面运动的案例（test_2d_elastic_gate、test_2d_T_pipe_VIPO_shell），也不会对壁面进行粒子排序。如果流体是几乎不动的（test_2d_hydrostatic_fluid_shell），甚至无需对流体进行粒子排序。
+
+# 文件输出与时间设定
+
+```cpp
+    //	Define the methods for I/O operations and observations of the simulation.
+    //----------------------------------------------------------------------
+    BodyStatesRecordingToVtp write_real_body_states(sph_system);
+    write_real_body_states.addToWrite<Real>(wall_boundary, "Average1stPrincipleCurvature");
+```
+
+定义文件输出
+
+```cpp
+    //	Setup computing and initial conditions.
+    //----------------------------------------------------------------------
+    Real &physical_time = *sph_system.getSystemVariableDataByName<Real>("PhysicalTime");
+    size_t number_of_iterations = 0;
+    int screen_output_interval = 100;
+    Real end_time = 10.0;
+    Real output_interval = end_time / 200.0;
+    //----------------------------------------------------------------------
+    //	Statistics for CPU time
+    //----------------------------------------------------------------------
+    TickCount t1 = TickCount::now();
+    TimeInterval interval;
+    //----------------------------------------------------------------------
+    //	First output before the main loop.
+    //----------------------------------------------------------------------
+    write_real_body_states.writeToFile();
+```
+
+首先获取了模拟的物理时间，然后初始化迭代次数为零，设定每100步在屏幕上输出一次。总共模拟10秒。每0.05秒输出一次粒子信息。
+
+# 主循环
+
+## 外循环
+
+```cpp
+    while (physical_time < end_time)
+    {
+        Real integration_time = 0.0;
+        /** Integrate time (loop) until the next output time. */
+        while (...) {...}
+        TickCount t2 = TickCount::now();
+        /** write run-time observation into file */
+        write_real_body_states.writeToFile();
+        fluid_axial_observer_contact.updateConfiguration();
+        fluid_radial_observer_contact.updateConfiguration();
+        write_fluid_axial_velocity.writeToFile(number_of_iterations);
+        write_fluid_radial_velocity.writeToFile(number_of_iterations);
+        TickCount t3 = TickCount::now();
+        interval += t3 - t2;
+    }
+```
+
+
 
 # 观测数据与模拟验证
 
