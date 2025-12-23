@@ -4,7 +4,12 @@
 - 流入速度设定
 - `defineMaterial`和`defineClosure`的区别
 - 周期性边界
-- 流壳耦合（壁面只有单层粒子）
+- 简单的流壳耦合（壁面只有单层粒子，但是壁面固定）
+- `SimpleDynamics`对象是如何构造和执行的（深入探究源码）
+
+首先看一下结果。在模拟的最后一个时间步，能从轴向速度和原始ID的云图看到速度已经在整个域内形成了抛物线分布：
+
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251223115949.png)
 
 # 命令行参数
 
@@ -172,7 +177,7 @@ void channel_flow_shell(...) {
 `InflowVelocity`的函数调用运算符被重载了，因此它实际上会生成一个函数对象。它有三个形参：位置、速度、当前时间。`u_ave`是随时间变化的平均速度，形式如下：
 $$
 \bar{u}=\begin{cases}
-0.5u_\mathrm{ref}[1-\cos(\pi t/t_\mathrm{ref})], &t<t_\mathrm{ref};\\
+0.5u_\mathrm{ref}[1-\cos(\pi t/t_\mathrm{ref})], &t < t_\mathrm{ref};\\
 u_\mathrm{ref}, &t\geq t_\mathrm{ref}.
 \end{cases}
 $$
@@ -403,6 +408,8 @@ void channel_flow_shell(...)
 
 在二维溃坝案例中，我们使用`water_block.defineMaterial<WeaklyCompressibleFluid>(rho0_f, c_f);`来定义材料属性。这里却没有用`defineMaterial`，而是用了`defineClosure`。这是因为除了`WeaklyCompressibleFluid`还有`Viscosity`。`defineMaterial`和`defineClosure`的核心区别是：一个只创建“单一材料模型(`BaseMaterial`派生类)”，另一个创建“物理闭包（`Closure`）”，把多个材料/本构/附加模型组合成一个整体材料对象。在 SPHinXsys 里二者最终都会把`SPHBody::base_material_`指向你创建的对象，但对象类型和用途不同。`WeaklyCompressibleFluid`需要两个参数：密度和声速，`Viscosity`需要一个参数：`mu_f`。为了让编译器知道哪些参数是传给`WeaklyCompressibleFluid`的，我们需要用`ConstructArgs`吧`rho_f`和`c_f`打包。
 
+`Solid`这种材料在创建时也是需要参数的，只不过这里使用了默认参数：密度1.0，接触刚度1.0，接触摩擦系数1.0。不过这个案例中也没有用到这些参数——你可以把密度改为任意非零值，接触刚度和接触摩擦系数改为任意值，然后会发现结果没变。当壁面运动时，这些参数才会起作用。
+
 # 定义关系
 
 ```cpp
@@ -522,8 +529,12 @@ $$
     periodic_condition.update_cell_linked_list_.exec();
     /** initialize configurations for all bodies. */
     sph_system.initializeSystemConfigurations();
-    water_block_complex.updateConfiguration(); // 可以删？？？？？？
+    /** initial curvature*/
+    shell_curvature.exec();
+    water_block_complex.updateConfiguration();
 ```
+
+`water_block_complex.updateConfiguration()`的作用不明确，毕竟之前刚`sph_system.initializeSystemConfigurations()`，这里就update了。除非`shell_curvature.exec()`内部会改变粒子位置/法向/需要重建接触列表（一般曲率计算不移动粒子），否则这句多半可以省。
 
 ### 周期性边界的执行
 
@@ -599,7 +610,7 @@ $$
     {
         Real integration_time = 0.0;
         /** Integrate time (loop) until the next output time. */
-        while (...) {...}
+        while (integration_time < output_interval) {...}
         TickCount t2 = TickCount::now();
         /** write run-time observation into file */
         write_real_body_states.writeToFile();
@@ -612,7 +623,78 @@ $$
     }
 ```
 
+在外循环中，输出粒子信息，更新观测粒子的邻居表，输出观测数据。这一段的用时记录在`t3-t2`中。
 
+## 中循环
+
+```cpp
+        while (integration_time < output_interval)
+        {
+            Real Dt = get_fluid_advection_time_step_size.exec();
+            update_density_by_summation.exec();
+            viscous_acceleration.exec();
+            transport_correction.exec();
+
+            size_t inner_ite_dt = 0;
+            Real relaxation_time = 0.0;
+            while (relaxation_time < Dt) {...}
+            
+            if (number_of_iterations % screen_output_interval == 0)
+            {
+                std::cout << std::fixed << std::setprecision(9) << "N=" << number_of_iterations << "	Time = "
+                          << physical_time
+                          << "	Dt = " << Dt << "	Dt / dt = " << inner_ite_dt << "\n";
+            }
+            number_of_iterations++;
+
+            /** Water block configuration and periodic condition. */
+            periodic_condition.bounding_.exec();
+            if (number_of_iterations % 100 == 0 && number_of_iterations != 1)
+            {
+                particle_sorting.exec();
+            }
+            water_block.updateCellLinkedList();
+            periodic_condition.update_cell_linked_list_.exec();
+            water_block_complex.updateConfiguration();
+        }
+```
+
+中循环也是dual-criteria timestepping的外循环。首先获取了对流时间步长。然后依次进行密度求和、更新黏性力、传输速度修正（见[Schemes for fluid dynamics — SPHinXsys documentation](https://www.sphinxsys.org/html/theory.html#dual-criteria-time-stepping)）。初始化内循环的迭代次数`inner_ite_dt`为0，初始化松弛时间为0。接着在屏幕上打印了中层循环的而迭代次数、物理时间、中层循环的时间步长（对流时间步长）、内层循环迭代了多少次。最后更新周期性边界、CLL和邻居表，之前已经分析过。
+
+## 内循环
+
+```cpp
+            while (relaxation_time < Dt)
+            {
+                Real dt = SMIN(get_fluid_time_step_size.exec(), Dt);
+                /** Fluid pressure relaxation */
+                pressure_relaxation.exec(dt);
+                /** velocity */
+                parabolic_inflow.exec();
+                /** Fluid density relaxation */
+                density_relaxation.exec(dt);
+
+                relaxation_time += dt;
+                integration_time += dt;
+                physical_time += dt;
+
+                inner_ite_dt++;
+            }
+```
+
+首先获取了内循环的时间步长（声学时间步长），然后依次进行了动量方程的求解、入口速度的施加、连续性方程的求解。这个**顺序是有讲究的**。动量方程会更新一步速度，然后才能施加入口速度的条件，这样确保了入口速度是我们所指定的。而连续性方程求解中需要用到速度，因此有必要把入口速度施加放在连续性方程更新之前，确保了使用正确的入口速度来求解连续性方程。然后更新各种时间和内循环迭代轮数。
+
+# 打印耗时
+
+```cpp
+    TickCount t4 = TickCount::now();
+
+    TimeInterval tt;
+    tt = t4 - t1 - interval;
+    std::cout << "Total wall time for computation: " << tt.seconds() << " seconds." << std::endl;
+```
+
+主循环结束后，打印计算的耗时，这部分耗时除去了IO的时间。
 
 # 观测数据与模拟验证
 
