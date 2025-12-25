@@ -96,6 +96,8 @@ class WallBoundary : public ComplexShape
 
 `add`和`subtract`这两行代码看着挺难理解的。我以`add`为例，讲讲它在底层在做什么。`WallBoundary`继承于`ComplexShape`，后者又继承于`BinaryShape`，`BinaryShape`具有`add`成员函数。`add`成员函数将在其`sub_shape_ptrs_keeper_`（储存`unique_ptr<Shape*>`的vector）添加一个指向`GeometricShapeBox`对象的`Shape`指针，然后在`sub_shapes_and_ops_`（储存`pair<Shape *, ShapeBooleanOps>`的vector）中添加一个`pair`：`(上面创建的Shape指针,add)`。创建指向`GeometricShapeBox`对象的`Shape`指针时，使用的参数为`Transform(outer_wall_translation)`和`outer_wall_halfsize`，其中前者调用了构造函数`explicit BaseTransform::BaseTransform(const VecType &translation)`表示平移变换，后者表示盒子一半尺寸，将传入`GeometricBox`的构造函数。
 
+这里并没有用到`ComplexShape`的特性，令`WallBoundary`继承于`BinaryShape`足矣。
+
 # main函数
 
 ## 定义系统

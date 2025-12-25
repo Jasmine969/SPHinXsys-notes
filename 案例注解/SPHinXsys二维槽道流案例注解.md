@@ -49,7 +49,7 @@ namespace SPH
 class WaterBlock : public MultiPolygonShape
 {
   public:
-    class FluidAxialObserver;
+    class FluidAxialObserver; // 好像是多余的
     explicit WaterBlock(const std::vector<Vecd> &shape, const std::string &shape_name) : MultiPolygonShape(shape_name)
     {
         multi_polygon_.addAPolygon(shape, ShapeBooleanOps::add);
