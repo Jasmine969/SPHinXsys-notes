@@ -1,3 +1,5 @@
+系统：CentOS 7.9，编译器：GCC 13.4。SPHinXsys版本：v1.2.1-sycl。
+
 # 安装依赖库
 
 ## 安装OpenBLAS
@@ -140,7 +142,7 @@ export TBB_DIR=/opt/sphinxsys-soft/oneTBB-2022.3.0/lib64/cmake/TBB
 export GTest_DIR=/opt/sphinxsys-soft/googletest-1.17.0
 export Boost_DIR=/opt/sphinxsys-soft/Boost-1.88.0
 export Simbody_DIR=/opt/sphinxsys-soft/Simbody-3.7
-export pybind11_DIR=/data/zhuh_software/pyenteric/lib/python3.10/site-packages/pybind11
+export pybind11_DIR=/path/to/my-venv/lib/python3.10/site-packages/pybind11
 export Eigen3_DIR=/opt/sphinxsys-soft/eigen-3.4.0
 export BLAS_DIR=/opt/OpenBLAS
 export LAPACK_DIR=/opt/sphinxsys-soft/lapack-3.8.0

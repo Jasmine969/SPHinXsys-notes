@@ -13,7 +13,7 @@ Real AcousticTimeStep::reduce(size_t index_i, Real dt)
 }
 ```
 
-可以看到被归约的变量是$c+|v|_i$，也即$c+|v|_i$。
+可以看到被归约的变量是$$c+|v|_i$$，也即$$c+|v|_i$$。
 
 ```cpp
 Real AcousticTimeStep::outputResult(Real reduced_value)
@@ -42,7 +42,7 @@ $$
 $$
 \Delta t_\mathrm{ad}=\mathrm{CFL_{ad}}\min\left\{\frac{h_\mathrm{min}}{|v|_\mathrm{max}},\sqrt{\frac{h_\mathrm{min}}{4|a|_\mathrm{max}}},\frac{h_\mathrm{min}}{|v|_\mathrm{ref}}\right\}
 $$
-这里$|v|_\mathrm{ref}$是特征速度，由用户给定，溃坝案例中是$\sqrt{2gH_\mathrm{max}}$。
+这里$$|v|_\mathrm{ref}$$是特征速度，由用户给定，溃坝案例中是$$\sqrt{2gH_\mathrm{max}}$$。
 
 # AdvectionViscousTimeStep
 
@@ -50,5 +50,5 @@ $$
 $$
 \Delta t_\mathrm{ad}=\mathrm{CFL_{ad}}\min\left\{\frac{h_\mathrm{min}}{|v|_\mathrm{max}},\sqrt{\frac{h_\mathrm{min}}{4|a|_\mathrm{max}}},\frac{h_\mathrm{min}}{|v|_\mathrm{ref}},\frac{h_\mathrm{min}^2}{\nu}\right\}
 $$
-这里$\nu$是运动粘度。
+这里$$\nu$$是运动粘度。
 

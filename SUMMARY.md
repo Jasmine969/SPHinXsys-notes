@@ -22,7 +22,6 @@
 	* [transport velocity correction](源码剖析/transport%20velocity%20correction.md)
 	* [viscous dynamics](源码剖析/viscous%20dynamics.md)
 	* [从源码到范式：SPHinXsys 的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys%20的RAII所有权设计与指针策略.md)
-	* [几何创建](源码剖析/几何创建.md)
 	* [粒子生成](源码剖析/粒子生成.md)
 * 其他
 	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)

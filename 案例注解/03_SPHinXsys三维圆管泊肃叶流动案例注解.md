@@ -274,7 +274,7 @@ void EmitterInflowInjection::update(size_t original_index_i, Real dt)
 
 ## 定义
 
-流出盒子定义在$$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
+流出盒子定义在$$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box。
 
 ```cpp
 void poiseuille_flow(...) {
@@ -287,4 +287,79 @@ void poiseuille_flow(...) {
 }
 ```
 
-未完待续……
+## 执行
+
+```cpp
+void poiseuille_flow(...) {
+    ...
+	while (physical_time < end_time)
+    {
+		...
+        while (integration_time < Output_Time)
+        {
+            ... // 内循环
+            disposer_outflow_deletion.exec();
+            ...
+        }
+        ...
+    }
+    ...
+}
+```
+
+`disposer_outflow_deletion.exec()`会为每一个粒子调用`DisposerOutflowDeletion::update`：
+
+```cpp
+void DisposerOutflowDeletion::update(size_t index_i, Real dt)
+{
+    mutex_switch_to_buffer_.lock();
+    while (aligned_box_.checkUpperBound(pos_[index_i]) && index_i < particles_->TotalRealParticles())
+    {
+        particles_->switchToBufferParticle(index_i);
+    }
+    mutex_switch_to_buffer_.unlock();
+}
+```
+
+在互斥锁保护下，检查当前粒子是否超出了disposer边界，以及当前粒子索引是否小于real particle的数目。如果是，则把这个粒子转为buffer particle。
+
+## 深入探究
+
+容易引起困惑的是
+
+1. `AlignedBoxByCell`只遍历box内部的粒子，为什么越界粒子也会被遍历到？
+
+2. 为什么这里使用的是while循环，而不是简单的if语句？
+
+3. 按理说update的粒子都是real particle，为什么还要再检查`index_i < particles_->TotalRealParticles()`，不是多余吗？
+
+第一个问题容易回答：CLL是在流出边界条件执行完毕后方才执行，所以此时CLL是上一时间步的CLL，这个越界的粒子仍然能够被遍历到。
+
+对于后面两个问题，我们需要深入源码看看。我们首先假设一共有5000个real particle。遍历sortedID为#0-4998粒子（后面提到的ID默认都是sortedID，存储顺序也是按sortedID）时都没有检测到有粒子跑出disposer，遍历到#4999粒子时，检测到#4999越界。另外，因为4999<5000，所以while的条件满足，进入循环。进入`particles_->switchToBufferParticle(index_i)`看看：
+
+```cpp
+void BaseParticles::switchToBufferParticle(size_t index)
+{
+    size_t last_real_particle_index = TotalRealParticles() - 1;
+    if (index < last_real_particle_index)
+    {
+        copyFromAnotherParticle(index, last_real_particle_index);
+        // update original and sorted_id as well
+        std::swap(original_id_[index], original_id_[last_real_particle_index]);
+        sorted_id_[original_id_[index]] = index;
+    }
+    decrementTotalRealParticles();
+}
+```
+
+传入的实参`index`的值是4999。`TotalRealParticles()`的值是5000，于是`last_real_particle_index`值是4999。在if判断中，`index`和`last_real_particle_index`的值相等，if条件不满足，跳过。最后`decrementTotalRealParticles()`会将`TotalRealParticles()`的值减去1。此时#4999粒子已不在real particles的范围内，后续就不会参与interaction和update了。这也是为什么这个函数名叫做`switchToBufferParticle`。
+
+现在退出`BaseParticles::switchToBufferParticle`。再次来到while的判断，因为`particles_->TotalRealParticles()`已经变成4999了，所以while条件不满足，退出循环。
+
+好像while循环和`index_i < particles_->TotalRealParticles()`判断并没有起作用？这是因为我们选定的越界粒子太特殊了。实际上越界的不一定恰为#4999号粒子。这次我们假设#4000和#4999都越界了，那么在遍历到#4000号时便会使得while条件满足，传入`BaseParticles::switchToBufferParticle`的`index`就是4000。`last_real_particle_index`还是4999。此时4000<4999，if条件满足，进入内部作用域。`copyFromAnotherParticle(index, last_real_particle_index)`会把#4999粒子的属性拷贝给#4000粒子（安全的，因为#4000粒子即将被剔除real particle，它原本的属性已经无需保留）。然后把#4000粒子和#4999粒子交换。结果是越界粒子变成了#4999，原#4999粒子现在变成了#4000。现在就可以安全地执行`decrementTotalRealParticles()`了。
+
+退出`BaseParticles::switchToBufferParticle`。再次来到while的判断。注意此时`index_i`（#4000）粒子已经具备了原#4999粒子的属性，而原#4999粒子是越界的。如果这里不是while循环而是if判断，那么这个越界的粒子就再也不会被处理了，因为再也不会遍历到#4000了。幸好这里是while。于是再次进入`BaseParticles::switchToBufferParticle`，交换当前的#4000（原#4999）和当前的#4998，把原#4999粒子也删掉，`TotalRealParticles()`变成了4998。再次进入while条件判断，原#4998是不越界的，因此while条件不满足。现在我们回答了第二个问题（为什么要while而非if）。
+
+注意，当我们删除粒子时，disposer的loop range并没有更改。因此，尽管real particle的数目已经变成了4998，while循环依旧会遍历到4998和4999。`index_i < particles_->TotalRealParticles()`的判断，避免了这里把buffer particle也删了（非预期行为）。现在我们回答了第二个问题（为什么要额外判断`index_i < particles_->TotalRealParticles()`）。
+
+补充一下，储存real particles的内存空间是连续的，储存buffer particles的内存空间也是连续的，并且buffer particle紧跟在real particle后面。因此每次删除粒子都是删最后一个real particle，而非直接把越界粒子删掉。这说明了交换粒子的必要性。
