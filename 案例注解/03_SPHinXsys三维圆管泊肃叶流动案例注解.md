@@ -2,6 +2,8 @@
 
 - 三维模型的建立与模拟
 - 流入流出边界
+- particle_bound_与buffer particle的概念
+- `AlignedBoxByParticle`和`AlignedBoxByCell`的区别
 - 多分辨率粒子分布（不同body采用不同分辨率，但同一body分辨率相同）
 - 自定义光滑长度
 
@@ -137,6 +139,12 @@ TEST(poiseuille_flow, 10_particles)
 
 使用`TriangleMeshShapeCylinder`创建了流体的几何。五个参数依次为：轴线方向矢量、流体半径、半长度、网格精度和圆柱中心点坐标。关于SimTK的网格精度，在[几何创建](../几何创建.md)中已有介绍，在此不赘。这样一来，流体的几何位于$0\leq y \leq 10\Delta L_\mathrm{f}$的区间内。
 
+使用`inlet_particle_buffer`进行了粒子生成。`generateParticlesWithReserve<BaseParticles, Lattice>(inlet_particle_buffer)`其实与`generateParticles<BaseParticles, Lattice>()`差不多，区别是将`particles_bound_`递增了`buffer_size`（因为用户传入的是0.5，所以递增real particle数目的一半），并且设置`inlet_particle_buffer`的`is_particles_reserved_`属性为`true`。
+
+**理解particle_bound_与buffer particle**
+
+`particles_bound_`的概念类似于标准库vector的capacity，而real particle数目类似于标准库vector的size。递增之后，就会**多分配一段大小为`buffer_size`个粒子信息所需的内存**。我们称这些额外内存段上的粒子为buffer particle。buffer particle不是真正的particle，它们的粒子属性没有意义，不会参与interaction，更不会写入VTP文件。buffer particle的意义是为inflow的粒子提前分配内存空间（空房间），不然在并行模拟时动态分配内存开销是很大的。
+
 # 入口流速
 
 入口流速设定为
@@ -187,32 +195,37 @@ void poiseuille_flow(const Real resolution_ref, const Real resolution_shell, con
 
 从`AlignedBox`的设定来看，入口速度的盒子长度为$10\Delta L_\mathrm{f}$，将其平移后，所有$-2\Delta L_\mathrm{f}\leq y \leq 8\Delta L_\mathrm{f}$区间内的粒子速度被设置为给定的入口流速。
 
-# 流入流出边界
+# 流入边界
 
 ## 定义
 
-流入盒子定义在$-R\leq x\leq R, -4\Delta L_\mathrm{f}\leq y \leq 0, -R\leq z\leq R$区间内，也即
+流入盒子定义在$-R\leq x\leq R, 0\leq y \leq 4\Delta L_\mathrm{f}, -R\leq z\leq R$区间内。它在构造时会从给定的`emitter`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
 
 ```cpp
 void poiseuille_flow(...) {
 	const Vec3d emitter_halfsize(fluid_radius, resolution_ref * 2, fluid_radius);
     const Vec3d emitter_translation(0., resolution_ref * 2, 0.);
-	...
-    const Vec3d disposer_halfsize(fluid_radius * 1.1, resolution_ref * 2, fluid_radius * 1.1);
-    const Vec3d disposer_translation(0., full_length - disposer_halfsize[1], 0.);
     ...
     AlignedBoxByParticle emitter(water_block, AlignedBox(yAxis, Transform(Vec3d(emitter_translation)), emitter_halfsize));
     SimpleDynamics<fluid_dynamics::EmitterInflowInjection> emitter_inflow_injection(emitter, inlet_particle_buffer);
     ...
-    AlignedBoxByCell disposer(water_block, AlignedBox(yAxis, Transform(Vec3d(disposer_translation)), disposer_halfsize));
-    SimpleDynamics<fluid_dynamics::DisposerOutflowDeletion> disposer_outflow_deletion(disposer);
-    ...
 }
 ```
 
+注意这里使用的是emitter是`AlignedBoxByParticle`，而非入口流速指定那里使用的`AlignedBoxByCell`。这两个的区别在于`AlignedBoxByParticle`对象记录的是被构造时`AlignedBox`区域的粒子ID。所以后续遍历时，无论这些粒子是否跑出了`AlignedBox`，都会把这些粒子遍历到。而`AlignedBoxByCell`记录的是cell（CLL中的cell）的ID。后续遍历时，无论粒子初始时是否属于这个cell，只要检测到某个粒子当前在cell里，就会被遍历到。
+
+这里给`EmitterInflowInjection`传入的必须是`AlignedBoxByParticle`类型的对象，为什么呢？且看下面流入边界是如何执行的。
+
 ## 执行
 
-在内循环结束、更新CLL和邻居表之前执行：
+看下面这张图。假设上方是初始粒子分布。注意这里有个容易误解的地方：**图上显示的所有粒子，包括emitter区域的粒子，都是real particle**。不要误认为emitter区域的是buffer particle。如前所述，buffer particle的属性是没有意义的，只是起到预留内存空间的作用。根据案例设定，emitter右边界在$4\Delta L_\mathrm{f}$的位置。当时间向前推进，粒子向右移动，程序检测到有一个粒子越出了emitter的右边界，这时，会依次执行：
+
+1. 在这个粒子原位拷贝出一个粒子，使用的是buffer particle的内存。换言之，我们把一个buffer particle转换为了real particle，这一新的particle具有和原粒子一模一样的属性（除了ID）。结果是real particle增加了一个，buffer particle减少了一个。
+2. 把旧的particle按周期性边界映射回左边界附近（蛇形箭头），用公式描述就是$y'=y-4\Delta L_\mathrm{f}$。映射回去的粒子属性设为默认属性。这样我们就保证了emitter永远有足够的粒子来注入内部的bulk flow。
+
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251226213505.png)
+
+理解了过程，下面来看代码。在内循环结束、更新CLL和邻居表之前执行：
 
 ```cpp
 void poiseuille_flow(...) {
@@ -222,14 +235,54 @@ void poiseuille_flow(...) {
 		...
         while (integration_time < Output_Time)
         {
-            ...
-            /** Water block configuration and periodic condition. */
+            ... // 内循环
             emitter_inflow_injection.exec();
-            disposer_outflow_deletion.exec();
             ...
         }
         ...
     }
+    ...
+}
+```
+
+`emitter_inflow_injection.exec()`会为每一个粒子调用`EmitterInflowInjection::update`：
+
+```cpp
+void EmitterInflowInjection::update(size_t original_index_i, Real dt)
+{
+    size_t sorted_index_i = sorted_id_[original_index_i];
+    if (aligned_box_.checkUpperBound(pos_[sorted_index_i]))
+    {
+        mutex_switch_to_real_.lock();
+        buffer_.checkEnoughBuffer(*particles_);
+        particles_->createRealParticleFrom(sorted_index_i);
+        mutex_switch_to_real_.unlock();
+
+        /** Periodic bounding. */
+        pos_[sorted_index_i] = aligned_box_.getUpperPeriodic(pos_[sorted_index_i]);
+        rho_[sorted_index_i] = fluid_.ReferenceDensity();
+        p_[sorted_index_i] = fluid_.getPressure(rho_[sorted_index_i]);
+    }
+}
+```
+
+首先需获取sortedID，因为属性是按照sortedID存储的。然后用`checkUpperBound`检查当前粒子是否越出了右边界。如果是，并且buffer尚有足够内存，则原位拷贝一个新的粒子。启用互斥锁的原因是这类边界注入通常可能在并行循环里跑，切换粒子状态、修改粒子数量/容器时必须保证线程安全。
+
+创建完毕后，把旧的粒子映射回左边。其密度设为默认密度，压力按照默认密度计算得出。
+
+# 流出边界
+
+## 定义
+
+流出盒子定义在$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
+
+```cpp
+void poiseuille_flow(...) {
+    const Vec3d disposer_halfsize(fluid_radius * 1.1, resolution_ref * 2, fluid_radius * 1.1);
+    const Vec3d disposer_translation(0., full_length - disposer_halfsize[1], 0.);
+    ...
+    AlignedBoxByCell disposer(water_block, AlignedBox(yAxis, Transform(Vec3d(disposer_translation)), disposer_halfsize));
+    SimpleDynamics<fluid_dynamics::DisposerOutflowDeletion> disposer_outflow_deletion(disposer);
     ...
 }
 ```

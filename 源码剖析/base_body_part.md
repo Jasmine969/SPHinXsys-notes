@@ -43,3 +43,15 @@
 
 `BodyPartByParticle`：遍历开销是$O(N_\mathrm{part})$，但如果粒子集合需要频繁重建（粒子流动导致集合变化），重建成本可能高。
 `BodyPartByCell`：遍历开销大约是 $O(N_\mathrm{cells~in~region}+N_\mathrm{particles~in~those~cells})$；区域固定时，cell 集合通常相对稳定，而且能很好地跟随 cell linked list 的更新来“自动跟踪”区域内粒子。
+
+# AlignedBoxByParticle和AlignedBoxByCell
+
+`AlignedBoxByParticle`：
+
+- 记录的是被构造时`AlignedBox`区域的粒子ID。所以后续遍历时，无论这些粒子是否跑出了`AlignedBox`，都会把这些粒子遍历到。
+- 用于`EmitterInflowInjection`、`EmitterInflowCondition`。
+
+`AlignedBoxByCell`：
+
+- 记录的是cell的ID。后续遍历时，无论粒子初始时是否属于这个cell，只要检测到粒子当前在cell里，就会被遍历到。
+- 用于`InflowVelocityCondition<...>`、`DisposerOutflowDeletion`
