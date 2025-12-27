@@ -117,7 +117,7 @@ class ParticleGenerator<SurfaceParticles, WallBoundary> : public ParticleGenerat
 
 生成shell粒子一般有两种方法，第一种如同溃坝案例中一样：先定义shell的几何，然后用`generateParticles<SurfaceParticles, Lattice>()`生成粒子，见`ball_shell_collision.cpp`。第二种就是这里的方法：不定义几何（即采用默认几何），自己规定粒子位置和体积，因为是shell，我们还需要规定其表面性质，包括法方向和厚度。
 
-具体而言，这里写了一个特化的`ParticleGenerator<SurfaceParticles, Style>`模板，它继承于`ParticleGenerator<SurfaceParticles>`。`WallBoundary`只有声明，没有定义，但是不需要定义，因为它的作用只是将此特化的`ParticleGenerator`和`src/`中的`ParticleGenerator`区分开来。`resolution_ref_`是粒子间距$\Delta L$；`DL_sponge`是施加流入条件的宽度（$20\Delta L$）；`BW`是壁面比水体多出的宽度（$4\Delta L$）；`wall_thickness_`是壁面（壳层）厚度。
+具体而言，这里写了一个特化的`ParticleGenerator<SurfaceParticles, Style>`模板，它继承于`ParticleGenerator<SurfaceParticles>`。`WallBoundary`只有声明，没有定义，但是不需要定义，因为它的作用只是将此特化的`ParticleGenerator`和`src/`中的`ParticleGenerator`区分开来。`resolution_ref_`是粒子间距$$\Delta L$$；`DL_sponge`是施加流入条件的宽度（$20\Delta L$）；`BW`是壁面比水体多出的宽度（$4\Delta L$）；`wall_thickness_`是壁面（壳层）厚度。
 
 我们将`ParticleGenerator`的`prepareGeometricData()`进行了覆盖。在函数体中，首先统计了有多少对壁面颗粒（一个上壁面+一个下壁面颗粒称为一对）。对于每一对颗粒，它的横坐标是`-DL_sponge_ - BW_ + (Real(i) + 0.5) * resolution_ref_`。这里之所以要给`Real(i)`加上0.5，是为了和流体粒子对齐，流体粒子将用lattcie生成，它们是在网格中心的。`y1`和`y2`分别将上壁面向上平移$\Delta L/2$和下壁面向下平移$\Delta L/2$。`addPositionAndVolumetricMeasure`的作用是添加位置信息和体积信息，二维模拟的shell是一维的，所以体积就是$\Delta L$。`addSurfaceProperties`的作用是添加壁面法向和厚度信息。
 
