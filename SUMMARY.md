@@ -1,5 +1,6 @@
 ## Summary
 
+* [SPHinXsys notes of Jasmine Feng](README.md)
 * [安装](安装/源码编译安装SPHinXsys.md)
 * 案例注解
 	* [01 二维溃坝案例注解](案例注解/01_SPHinXsys二维溃坝案例注解.md)
