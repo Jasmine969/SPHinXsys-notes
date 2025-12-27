@@ -11,15 +11,15 @@
 
 # body创建
 
-这是壁面与流体的几何的左端局部视图。壁面的粒子间距（$\Delta L_\mathrm{s}$）是流体的（$\Delta L_\mathrm{f}$）一半。壁面比流体的边界多延伸出$4\Delta L_\mathrm{f}$的距离（程序中称为`wall_thickness`，记为$\delta_\mathrm{s}$），用来放置入口和出口的buffer。
+这是壁面与流体的几何的左端局部视图。壁面的粒子间距（$$\Delta L_\mathrm{s}$$）是流体的（$$\Delta L_\mathrm{f}$$）一半。壁面比流体的边界多延伸出$$4\Delta L_\mathrm{f}$$的距离（程序中称为`wall_thickness`，记为$$\delta_\mathrm{s}$$），用来放置入口和出口的buffer。
 
 ![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251224100332.png)
 
-流体网格的左边界为$y=0$的位置。流体粒子和壁面粒子都被放置在网格的中心。
+流体网格的左边界为$$y=0$$的位置。流体粒子和壁面粒子都被放置在网格的中心。
 
 ![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251224100023.png)
 
-于是我们可以计算出每个壁面粒子（序号为$j$，从零开始）的y坐标为：
+于是我们可以计算出每个壁面粒子（序号为$$j$$，从零开始）的y坐标为：
 $$
 y_j=\delta_\mathrm{s}+j\Delta L_\mathrm{s}+\Delta L_\mathrm{s}/2
 $$
@@ -77,7 +77,7 @@ class ParticleGenerator<SurfaceParticles, ShellBoundary> : public ParticleGenera
 
 壁面几何中有两个thickness需要区分。一个是`wall_thickness`，这是壁面比流体在y方向多延伸出的长度；另一个是`shell_thickness`，这才是壁面的厚度。
 
-上面的`prepareGeometricData()`规定了每个壁面粒子的位置、体积、法方向和壁面厚度。x和z坐标由圆的参数方程给出，注意半径比预期的多了$\Delta L_\mathrm{s}/2$，以避免和流体粒子重叠。y坐标的公式已经在上面给出，只不过程序里将最后一项做了等量代换（其实没必要，还更麻烦了）。对于壳体，粒子的体积是$(\Delta L_\mathrm{s})^2$，法向量是外法向（流体指向壁面）。
+上面的`prepareGeometricData()`规定了每个壁面粒子的位置、体积、法方向和壁面厚度。x和z坐标由圆的参数方程给出，注意半径比预期的多了$$\Delta L_\mathrm{s}/2$$，以避免和流体粒子重叠。y坐标的公式已经在上面给出，只不过程序里将最后一项做了等量代换（其实没必要，还更麻烦了）。对于壳体，粒子的体积是$$(\Delta L_\mathrm{s})^2$$，法向量是外法向（流体指向壁面）。
 
 ```cpp
 void poiseuille_flow(const Real resolution_ref, const Real resolution_shell, const Real shell_thickness) {
@@ -102,7 +102,7 @@ TEST(poiseuille_flow, 10_particles)
 
 注意shell具有自己的分辨率，是全局分辨率的一半。这就涉及到**多分辨率**的问题。因为shell的粒子间距是全局的一半，如果shell也采用全局光滑长度进行平滑，势必会过度平滑，造成失真（见下图）。因此，我们有必要相应减小shell的光滑长度，这通过`defineAdaptation<SPH::SPHAdaptation>(...)`来实现。括号中传入的
 
-- 第一个参数是光滑长度与粒子间距之比（$h/\Delta L$），默认值是1.3，设为1.15则有$h=1.15\Delta L$；
+- 第一个参数是光滑长度与粒子间距之比（$$h/\Delta L$$），默认值是1.3，设为1.15则有$$h=1.15\Delta L$$；
 - 第二个参数是全局分辨率与本body分辨率之比，默认指是1。这里是按照定义给的：`resolution_ref`是全局分辨率，`resolution_shell`是shell的分辨率。
 
 `defineMaterial`将材料设置为线弹性材料，似是没有必要（见下图），因为这个案例中壁面是固定不动的。我认为改成`Solid`也可以。
@@ -137,7 +137,7 @@ TEST(poiseuille_flow, 10_particles)
     water_block.generateParticlesWithReserve<BaseParticles, Lattice>(inlet_particle_buffer);
 ```
 
-使用`TriangleMeshShapeCylinder`创建了流体的几何。五个参数依次为：轴线方向矢量、流体半径、半长度、网格精度和圆柱中心点坐标。关于SimTK的网格精度，在[几何创建](../几何创建.md)中已有介绍，在此不赘。这样一来，流体的几何位于$0\leq y \leq 10\Delta L_\mathrm{f}$的区间内。
+使用`TriangleMeshShapeCylinder`创建了流体的几何。五个参数依次为：轴线方向矢量、流体半径、半长度、网格精度和圆柱中心点坐标。关于SimTK的网格精度，在[几何创建](../几何创建.md)中已有介绍，在此不赘。这样一来，流体的几何位于$$0\leq y \leq 10\Delta L_\mathrm{f}$$的区间内。
 
 使用`inlet_particle_buffer`进行了粒子生成。`generateParticlesWithReserve<BaseParticles, Lattice>(inlet_particle_buffer)`其实与`generateParticles<BaseParticles, Lattice>()`差不多，区别是将`particles_bound_`递增了`buffer_size`（因为用户传入的是0.5，所以递增real particle数目的一半），并且设置`inlet_particle_buffer`的`is_particles_reserved_`属性为`true`。
 
@@ -151,7 +151,7 @@ TEST(poiseuille_flow, 10_particles)
 $$
 \boldsymbol{v}=(0,2U_f(1-r^2/R^2),0)
 $$
-其中$r(x,z)=x^2+z^2$。
+其中$$r(x,z)=x^2+z^2$$。
 
 ```cpp
 //----------------------------------------------------------------------
@@ -193,13 +193,13 @@ void poiseuille_flow(const Real resolution_ref, const Real resolution_shell, con
 }
 ```
 
-从`AlignedBox`的设定来看，入口速度的盒子长度为$10\Delta L_\mathrm{f}$，将其平移后，所有$-2\Delta L_\mathrm{f}\leq y \leq 8\Delta L_\mathrm{f}$区间内的粒子速度被设置为给定的入口流速。
+从`AlignedBox`的设定来看，入口速度的盒子长度为$$10\Delta L_\mathrm{f}$$，将其平移后，所有$$-2\Delta L_\mathrm{f}\leq y \leq 8\Delta L_\mathrm{f}$$区间内的粒子速度被设置为给定的入口流速。
 
 # 流入边界
 
 ## 定义
 
-流入盒子定义在$-R\leq x\leq R, 0\leq y \leq 4\Delta L_\mathrm{f}, -R\leq z\leq R$区间内。它在构造时会从给定的`emitter`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
+流入盒子定义在$$-R\leq x\leq R, 0\leq y \leq 4\Delta L_\mathrm{f}, -R\leq z\leq R$$区间内。它在构造时会从给定的`emitter`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
 
 ```cpp
 void poiseuille_flow(...) {
@@ -218,10 +218,10 @@ void poiseuille_flow(...) {
 
 ## 执行
 
-看下面这张图。假设上方是初始粒子分布。注意这里有个容易误解的地方：**图上显示的所有粒子，包括emitter区域的粒子，都是real particle**。不要误认为emitter区域的是buffer particle。如前所述，buffer particle的属性是没有意义的，只是起到预留内存空间的作用。根据案例设定，emitter右边界在$4\Delta L_\mathrm{f}$的位置。当时间向前推进，粒子向右移动，程序检测到有一个粒子越出了emitter的右边界，这时，会依次执行：
+看下面这张图。假设上方是初始粒子分布。注意这里有个容易误解的地方：**图上显示的所有粒子，包括emitter区域的粒子，都是real particle**。不要误认为emitter区域的是buffer particle。如前所述，buffer particle的属性是没有意义的，只是起到预留内存空间的作用。根据案例设定，emitter右边界在$$4\Delta L_\mathrm{f}$$的位置。当时间向前推进，粒子向右移动，程序检测到有一个粒子越出了emitter的右边界，这时，会依次执行：
 
 1. 在这个粒子原位拷贝出一个粒子，使用的是buffer particle的内存。换言之，我们把一个buffer particle转换为了real particle，这一新的particle具有和原粒子一模一样的属性（除了ID）。结果是real particle增加了一个，buffer particle减少了一个。
-2. 把旧的particle按周期性边界映射回左边界附近（蛇形箭头），用公式描述就是$y'=y-4\Delta L_\mathrm{f}$。映射回去的粒子属性设为默认属性。这样我们就保证了emitter永远有足够的粒子来注入内部的bulk flow。
+2. 把旧的particle按周期性边界映射回左边界附近（蛇形箭头），用公式描述就是$$y'=y-4\Delta L_\mathrm{f}$$。映射回去的粒子属性设为默认属性。这样我们就保证了emitter永远有足够的粒子来注入内部的bulk flow。
 
 ![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251226213505.png)
 
@@ -274,7 +274,7 @@ void EmitterInflowInjection::update(size_t original_index_i, Real dt)
 
 ## 定义
 
-流出盒子定义在$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
+流出盒子定义在$$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
 
 ```cpp
 void poiseuille_flow(...) {
@@ -287,3 +287,4 @@ void poiseuille_flow(...) {
 }
 ```
 
+未完待续……
