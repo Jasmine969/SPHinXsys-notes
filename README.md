@@ -6,8 +6,6 @@ SPHinXsys是一个强大的开源C++库，用于基于光滑粒子流体动力�
 
 对于任何问题和贡献，请在[GitHub仓库](https://github.com/Jasmine969/SPHinXsys-notes)中提出issue或pull request。
 
-注：GitBook的行内公式使用的是双`$`符号包裹（`$$a+b=b+a$$`），这会使得我发布在其他平台的文章中行内公式与行间公式混乱。为了方便其他平台上的渲染，这里我统一使用单`$`符号包裹行内公式（`$a+b=b+a$`）。这个渲染问题短期内我不打算解决。您可以把源代码下载到本地，用您喜欢的Markdown编辑器打开，应该都能正确渲染。
-
 Due to limited time, there is no English version for the time being. Volunteers are welcome to contribute translations.
 
 For any questions and contributions, please raise an issue or a pull request in the [GitHub repository](https://github.com/Jasmine969/SPHinXsys-notes).
