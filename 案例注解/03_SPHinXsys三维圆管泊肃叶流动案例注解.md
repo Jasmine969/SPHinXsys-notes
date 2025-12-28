@@ -137,7 +137,7 @@ TEST(poiseuille_flow, 10_particles)
     water_block.generateParticlesWithReserve<BaseParticles, Lattice>(inlet_particle_buffer);
 ```
 
-使用`TriangleMeshShapeCylinder`创建了流体的几何。五个参数依次为：轴线方向矢量、流体半径、半长度、网格精度和圆柱中心点坐标。关于SimTK的网格精度，在[几何创建](../几何创建.md)中已有介绍，在此不赘。这样一来，流体的几何位于$$0\leq y \leq 10\Delta L_\mathrm{f}$$的区间内。
+使用`TriangleMeshShapeCylinder`创建了流体的几何。五个参数依次为：轴线方向矢量、流体半径、半长度、网格精度和圆柱中心点坐标。关于SimTK的网格精度，在[几何创建](../用户指南/几何创建.md)中已有介绍，在此不赘。这样一来，流体的几何位于$$0\leq y \leq 10\Delta L_\mathrm{f}$$的区间内。
 
 使用`inlet_particle_buffer`进行了粒子生成。`generateParticlesWithReserve<BaseParticles, Lattice>(inlet_particle_buffer)`其实与`generateParticles<BaseParticles, Lattice>()`差不多，区别是将`particles_bound_`递增了`buffer_size`（因为用户传入的是0.5，所以递增real particle数目的一半），并且设置`inlet_particle_buffer`的`is_particles_reserved_`属性为`true`。
 
@@ -384,4 +384,15 @@ void BaseParticles::switchToBufferParticle(size_t index)
     SimpleDynamics<thin_structure_dynamics::AverageShellCurvature> shell_curvature(wall_curvature_inner);
 ```
 
-如[02_SPHinXsys二维槽道流案例注解](02_SPHinXsys二维槽道流案例注解.md)中介绍的，这行代码
+如[02_SPHinXsys二维槽道流案例注解](02_SPHinXsys二维槽道流案例注解.md)中介绍的，这两行代码是为了计算曲率，因为壁面是不动的，所以也多余。可以认为是模板。
+
+density summation free surface？
+
+spatial temporal？
+
+# 自由液面识别
+
+```cpp
+    InteractionWithUpdate<SpatialTemporalFreeSurfaceIndicationComplex> inlet_outlet_surface_particle_indicator(water_block_inner, water_block_contact);
+```
+
