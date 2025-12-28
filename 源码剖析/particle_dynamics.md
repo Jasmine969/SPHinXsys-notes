@@ -1,6 +1,6 @@
 我们能看到很多dynamics（例如`fluid_dynamics`的`BaseIntegration`和`DensitySummation<Base, DataDelegationType>`）会同时继承`LocalDynamics`和`DataDelegationType`。
 
-这种写法的核心意图是把**“做什么”（dynamics的算法框架）**和**“能访问到哪些数据”（数据委托DataDelegate）**解耦，然后用模板把两者组合起来：
+这种写法的核心意图是把“做什么”（dynamics的算法框架）和“能访问到哪些数据”（数据委托DataDelegate）解耦，然后用模板把两者组合起来：
 - `LocalDynamics`：给派生类提供对**本体（body）及其粒子系统**的统一访问方式与生命周期（例如initialize / update / interaction这一类框架约定）。
 - `DataDelegationType`：给派生类提供**邻域/拓扑相关的数据视图**（邻居表、接触对等），决定这段dynamics能“看见”哪些邻居。
 
@@ -17,3 +17,4 @@
 读代码时的快速判断方法：
 - 模板参数/继承里出现`DataDelegateInner`→这段dynamics只依赖本体内部邻域。
 - 出现`DataDelegateContact`或`contact_configuration_`之类字段→这段dynamics会遍历接触体，并访问对方粒子数据。
+

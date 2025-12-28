@@ -1,11 +1,14 @@
 在`test_3d_poiseuille_flow_shell`案例中，我们将学到
 
 - 三维模型的建立与模拟
+- 多分辨率粒子分布（不同body采用不同分辨率，但同一body分辨率相同）
+- 自定义光滑长度
 - 流入流出边界
 - particle_bound_与buffer particle的概念
 - `AlignedBoxByParticle`和`AlignedBoxByCell`的区别
-- 多分辨率粒子分布（不同body采用不同分辨率，但同一body分辨率相同）
-- 自定义光滑长度
+- 自由表面识别
+- 各种density summation的适用场景
+- 更好地施加入口速度条件
 
 这个教程中，我们不区分分辨率（resolution）与粒子间距（particle spacing）的概念，认为两者等价。
 
@@ -372,7 +375,6 @@ void BaseParticles::switchToBufferParticle(size_t index)
 
 ```cpp
     InnerRelation shell_boundary_inner(shell_boundary);
-	...
     InteractionDynamics<thin_structure_dynamics::ShellCorrectConfiguration> wall_corrected_configuration(shell_boundary_inner);
 ```
 
@@ -380,19 +382,107 @@ void BaseParticles::switchToBufferParticle(size_t index)
 
 ```cpp
     ShellInnerRelationWithContactKernel wall_curvature_inner(shell_boundary, water_block);
-	...
     SimpleDynamics<thin_structure_dynamics::AverageShellCurvature> shell_curvature(wall_curvature_inner);
 ```
 
 如[02_SPHinXsys二维槽道流案例注解](02_SPHinXsys二维槽道流案例注解.md)中介绍的，这两行代码是为了计算曲率，因为壁面是不动的，所以也多余。可以认为是模板。
 
-density summation free surface？
-
-spatial temporal？
-
-# 自由液面识别
+## 自由表面识别
 
 ```cpp
     InteractionWithUpdate<SpatialTemporalFreeSurfaceIndicationComplex> inlet_outlet_surface_particle_indicator(water_block_inner, water_block_contact);
+    InteractionWithUpdate<fluid_dynamics::DensitySummationFreeStreamComplex> update_density_by_summation(water_block_inner, water_block_contact);
+    InteractionWithUpdate<fluid_dynamics::TransportVelocityCorrectionComplex<BulkParticles>> transport_velocity_correction(water_block_inner, water_block_contact);
 ```
+
+这里开启了自由表面识别。尽管这个案例中没有自由表面（溃坝那种），但是在入口边界和出口边界，粒子的邻居是不完整的，只有体相的邻居。而transport velocity correction应该只针对体相进行。所以有必要开启自由表面识别。它会给每个SPH粒子一个indicator，0表示体相，1表示自由表面。在那为什么二维溃坝和二维槽道流没有开自由表面识别呢？
+
+- 溃坝中没有用到transport velocity correction。而可能用到自由表面识别的density summation是`BaseDensitySummationComplex<Inner<FreeSurface>, Contact<>>`类型，但其中`BaseDensitySummationComplex<Inner<FreeSurface>>`无需indicator判断自由表面，而是强制令密度至少为初始密度（`SMAX(this->rho_sum_[index_i], this->rho0_)`）。因此，density summation也不需要自由表面识别。
+- 二维槽道流用到了transport velocity correction。此案例中采用了周期性边界条件，所以边界粒子的邻居并不会因为处在边界而减少。
+
+## 密度求和
+
+另外，我们看到本例中density summation使用的是`DensitySummationFreeStreamComplex`类型。它是一种比`DensitySummationComplexFreeSurface`更软的类型，并且需要用到indicator，而本例恰好也用`SpatialTemporalFreeSurfaceIndicationComplex`计算了indicator。基于目前学习的三个案例来看（[溃坝](./01_SPHinXsys二维溃坝案例注解.md)、[槽道流](02_SPHinXsys二维槽道流案例注解.md)、本例），做density summation的经验规则如下：
+
+- 自由液面采用`DensitySummationFreeStreamComplex`（溃坝）
+- 流入流出边界和自由流采用`DensitySummationFreeStreamComplex`（本例）
+- 没有自由液面，也没有流入流出边界（周期性边界的流入流出不算），采用`DensitySummationComplex`（槽道流）
+
+# 入口速度条件的施加顺序
+
+在[槽道流](02_SPHinXsys二维槽道流案例注解.md)案例中，速度入口在pressure relaxation和density relaxation中间施加：
+
+```cpp
+                /** Fluid pressure relaxation */
+                pressure_relaxation.exec(dt);
+                /** velocity */
+                parabolic_inflow.exec();
+                /** Fluid density relaxation */
+                density_relaxation.exec(dt);
+```
+
+当时我对此的解释是：
+
+> 动量方程会更新一步速度，然后才能施加入口速度的条件，这样确保了入口速度是我们所指定的。而连续性方程求解中需要用到速度，因此有必要把入口速度施加放在连续性方程更新之前，确保了使用正确的入口速度来求解连续性方程。
+
+可是在本例中，速度入口是在内循环最后施加的：
+
+```cpp
+                pressure_relaxation.exec(dt);
+                density_relaxation.exec(dt);
+                emitter_buffer_inflow_condition.exec();
+```
+
+到底哪个对呢？我做了两次试验。第一次，我把本例的`emitter_buffer_inflow_condition.exec();`调到两次relaxation中间，结果发现甚至没有通过gtest测试：
+
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251228215440.png)
+
+对比一下可视化的结果（颜色表示轴向速度）。当我们把`emitter_buffer_inflow_condition.exec();`调到中间的位置，内部流体的速度与入口出现了较大差异，而且粒子分布变得更乱了。
+
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251228215818.png)
+
+第二次试验，我把[槽道流](02_SPHinXsys二维槽道流案例注解.md)案例的`parabolic_inflow.exec();`调到了内循环的最后。下图中，名字中有`output`的案例都是原始代码跑出的结果（微小差异，看平均值）。`inflow-last`是把`parabolic_inflow.exec();`调到内循环最后的结果。左图是是轴线上某一点的速度对比，$u_y=1.5$的水平线表示预期收敛到的速度。不难发现，把入口速度条件调到最后，好像更接近目标速度了，而且波动也更小了。右上图中把案例的结果速度与目标速度进行了对比，`inflow-last`的RMSE最小；右下图计算了每个案例的速度方差，`inflow-last`的方差也是最小。
+
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251228220439.png)
+
+从这两个案例可以看出，似乎把入口速度放在内循环最后施加总是更合适的。为什么呢？我不太明白，问了一下AI，下面是它给出的回答。
+
+下面给出一个**更自洽、且能解释两次试验现象**的理解（结合SPHinXsys现有实现）。结论先行：
+
+- 对于本例这种**开边界 + 注入/删除**（`EmitterInflowInjection` / `DisposerOutflowDeletion`）的情形，把入口速度条件放在声学子步（acoustic sub-step）的最后，通常更稳定、整体误差更小。
+- 对于槽道流这种**周期边界/无注入**的情形，把入口速度放在中间或最后都可能工作；但“放最后”往往更像一个稳定的“投影/约束”步骤，你的试验也印证了这一点。
+
+## 为什么“放中间”反而更差？
+
+关键点是：在SPHinXsys的Verlet分裂时间推进里，`pressure_relaxation` 和 `density_relaxation` 并不是“动量方程 / 连续性方程”的严格分割；更准确地说，它们是一个声学时间步（acoustic step）内的两段更新，其中**两段都会以速度参与位置推进**。
+
+以流体积分的实现为例（在SPHinXsys源码中，`Integration2ndHalf::initialization()`会执行 `pos += vel * dt * 0.5`），这意味着：
+
+- 如果你把入口速度条件放在 `pressure_relaxation` 与 `density_relaxation` 之间，那么 `density_relaxation` 的初始化阶段会用“已经被你强制到目标剖面后的速度”去推进入口缓冲区粒子的位置半步。
+- 这在入口缓冲区相当于对粒子做了一次“强制对流”，它未必与该子步的压力/密度更新相一致，容易造成入口附近粒子出现非物理的聚集/稀疏，从而破坏粒子均匀性；在开边界场景里，这种不均匀还会与注入/删除机制耦合放大。
+
+于是就解释了你看到的现象：
+
+- 3D Poiseuille：把 `emitter_buffer_inflow_condition.exec()`挪到中间，会让入口区域粒子分布更乱、内区速度偏离更大，甚至导致gtest不通过。
+- 2D channel：把 `parabolic_inflow.exec()`挪到最后，入口速度与整体场更“平滑地衔接”，波动更小，部分区域更接近target。
+
+## 为什么“放最后”更稳定、也可能更准？
+
+需要换一个角度看待 `InflowVelocityCondition`：它更像是一个**速度投影/速度松弛（relaxation）算子**，而不是“方程求解器的一部分”。它会对盒子内粒子直接改写速度（可带松弛率），但并不会同步修正压力/密度/力等状态。
+
+因此更稳妥的做法是：
+
+1. 先让该声学子步的数值更新（两次relaxation）按照既定分裂格式完成——这包含了该子步内必要的位移推进与压力/密度相关量更新；
+2. 在子步末尾再对入口缓冲区的速度做一次投影，使其作为“下一子步开始时”的边界状态。
+
+从算子分裂（operator splitting）的视角看，这相当于在每个声学子步末尾施加一次Dirichlet速度约束：它不强行改变“本子步内部的推进轨迹”，但会保证下一步的边界初值更接近目标剖面，通常带来更好的稳定性。
+
+## 实用建议：不同边界类型如何放置入口速度条件？
+
+结合本教程两个算例的经验，可以给出一个简单的经验规则：
+
+- **开边界（有注入/删除、邻域不完整）**：优先把入口速度条件放在声学子步最后（`pressure_relaxation` + `density_relaxation` 之后）。必要时，额外在注入/删除之后（更新cell linked list之前）再补一次入口速度投影，用于让刚被周期映射回入口附近的粒子更快贴合目标剖面。
+- **周期边界或无注入**：两种顺序都可能可用；若你关心稳定性与整体误差，优先尝试“子步最后投影”。
+
+最后，回到我在槽道流注解里给的那段解释：“连续性方程要用速度，所以必须把入口速度放在密度更新之前”。在SPHinXsys当前实现里，这句话过于理想化了：`density_relaxation` 不只是“连续性更新”，它还包含位置推进并与压力相关项耦合；因此把入口速度硬插到中间不一定更“物理一致”，反而可能更不一致。
 
