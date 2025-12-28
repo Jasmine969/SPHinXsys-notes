@@ -21,6 +21,11 @@
 	* particle_dynamics
 		* [dynamic algorithm](源码剖析/particle_dynamics/dynamic%20algorithm.md)
 		* [fluid_dynamics](源码剖析/particle_dynamics/fluid_dynamics.md)
+			* [density summation](源码剖析/particle_dynamics/fluid_dynamics/density%20summation.md)
+			* [fluid integration](源码剖析/particle_dynamics/fluid_dynamics/fluid%20integration.md)
+			* [fluid timestep](源码剖析/particle_dynamics/fluid_dynamics/fluid%20timestep.md)
+			* [transport velocity correction](源码剖析/particle_dynamics/fluid_dynamics/transport%20velocity%20correction.md)
+			* [viscous dynamics](源码剖析/particle_dynamics/fluid_dynamics/viscous%20dynamics.md)
 
 	* particle_generator
 		* [粒子生成](源码剖析/particle_generator/粒子生成.md)
