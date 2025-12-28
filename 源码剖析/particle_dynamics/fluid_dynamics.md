@@ -1,5 +1,0 @@
-* [density summation](./fluid_dynamics/density%20summation.md)
-* [fluid integration](./fluid_dynamics/fluid%20integration.md)
-* [fluid timestep](./fluid_dynamics/fluid%20timestep.md)
-* [transport velocity correction](./fluid_dynamics/transport%20velocity%20correction.md)
-* [viscous dynamics](./fluid_dynamics/viscous%20dynamics.md)
