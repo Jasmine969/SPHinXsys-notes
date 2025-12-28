@@ -136,7 +136,7 @@ SPHBody(SPHSystem &sph_system, SharedPtr<Shape> shape_ptr);
     wall_boundary.generateParticles<BaseParticles, Lattice>();
 ```
 
-注生成`water_block`时，我们传入的是在栈上定义的`initial_water_block`。但是在生成`wall_boundary`时，我们传入的却是shared pointer。为什么这里使用了不同的构造方式呢？按照[从源码到范式：SPHinXsys 的RAII所有权设计与指针策略](../源码剖析/从源码到范式：SPHinXsys%20的RAII所有权设计与指针策略.md)一文所说，这里其实传入shared pointer是最合适的，符合RAII原则。需要注意的是，以下定义body的写法是不允许的：
+注生成`water_block`时，我们传入的是在栈上定义的`initial_water_block`。但是在生成`wall_boundary`时，我们传入的却是shared pointer。为什么这里使用了不同的构造方式呢？按照[从源码到范式：SPHinXsys 的RAII所有权设计与指针策略](../源码剖析/从源码到范式：SPHinXsys的RAII所有权设计与指针策略.md)一文所说，这里其实传入shared pointer是最合适的，符合RAII原则。需要注意的是，以下定义body的写法是不允许的：
 
 ```cpp
 SolidBody wall_boundary(sph_system, WallBoundary("WallBoundary"));
@@ -219,7 +219,7 @@ ContactRelation water_wall_contact(wall_boundary, {&water_block});
     Dynamics1Level<fluid_dynamics::Integration2ndHalfWithWallRiemann> fluid_density_relaxation(water_block_inner, water_wall_contact);
 ```
 
-关于fluid_integration相关类的详细介绍见[此](../源码剖析/particle_dynamics/fluid_dynamics/fluid%20integration.md)。`Integration1stHalfWithWallRiemann`是一个复合类型，既有内部交互，也有流体与壁面交互，使用Riemann solver实现物理场的稳定化，没有核函数修正。与`2ndHalf`系列相比，它执行对动量方程的离散实现。执行如下操作（`src\shared\particle_dynamics\fluid_dynamics\fluid_integration.hpp`）：
+关于fluid_integration相关类的详细介绍见[此](../源码剖析/particle_dynamics/fluid_dynamics/fluid_integration.md)。`Integration1stHalfWithWallRiemann`是一个复合类型，既有内部交互，也有流体与壁面交互，使用Riemann solver实现物理场的稳定化，没有核函数修正。与`2ndHalf`系列相比，它执行对动量方程的离散实现。执行如下操作（`src\shared\particle_dynamics\fluid_dynamics\fluid_integration.hpp`）：
 
 ```cpp
 // 1. 流体内部initialization() - 更新半步密度、压力、位置

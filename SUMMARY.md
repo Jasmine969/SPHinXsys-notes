@@ -28,20 +28,20 @@
 		
 	* particle_dynamics
 		* [overview](源码剖析/particle_dynamics/overview.md)
-		* [dynamic algorithm](源码剖析/particle_dynamics/dynamic%20algorithm.md)
+		* [dynamic algorithm](源码剖析/particle_dynamics/dynamic_algorithms.md)
 		* [fluid_dynamics](源码剖析/particle_dynamics/fluid_dynamics.md)
-			* [density summation](源码剖析/particle_dynamics/fluid_dynamics/density%20summation.md)
-			* [fluid integration](源码剖析/particle_dynamics/fluid_dynamics/fluid%20integration.md)
-			* [fluid timestep](源码剖析/particle_dynamics/fluid_dynamics/fluid%20timestep.md)
-			* [transport velocity correction](源码剖析/particle_dynamics/fluid_dynamics/transport%20velocity%20correction.md)
-			* [viscous dynamics](源码剖析/particle_dynamics/fluid_dynamics/viscous%20dynamics.md)
+			* [density summation](源码剖析/particle_dynamics/fluid_dynamics/density_summation.md)
+			* [fluid integration](源码剖析/particle_dynamics/fluid_dynamics/fluid_integration.md)
+			* [fluid timestep](源码剖析/particle_dynamics/fluid_dynamics/fluid_timestep.md)
+			* [transport velocity correction](源码剖析/particle_dynamics/fluid_dynamics/transport_velocity_correction.md)
+			* [viscous dynamics](源码剖析/particle_dynamics/fluid_dynamics/viscous_dynamics.md)
 		
 	* particle_generator
 		* [粒子生成](源码剖析/particle_generator/粒子生成.md)
 		
 	* [SPHinXsys 中用到的标签派发技术](源码剖析/SPHinXsys中用到的标签派发技术.md)
 	
-	* [从源码到范式：SPHinXsys 的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys%20的RAII所有权设计与指针策略.md)
+	* [从源码到范式：SPHinXsys的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys的RAII所有权设计与指针策略.md)
 	
 * 其他
 	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)
