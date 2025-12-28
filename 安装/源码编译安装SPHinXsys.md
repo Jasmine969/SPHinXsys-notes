@@ -153,9 +153,9 @@ export spdlog_DIR=/opt/sphinxsys-soft/spdlog-1.16.0
 source /opt/sphinxsys-soft/sphinxsys.env.sh
 mkdir build && cd build
 # no SYCL
-cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache -S ..
+cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized" -S ..
 # SYCL
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DSPHINXSYS_USE_SYCL=ON -DSPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda -S ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DSPHINXSYS_USE_SYCL=ON -DSPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda -DCMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized" -S ..
 make -j40 # 不建议占用全部核心
 ```
 

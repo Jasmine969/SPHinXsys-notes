@@ -9,20 +9,23 @@
 * 用户指南
     * [几何创建](用户指南/几何创建.md)
 * 源码剖析
-	* [base_body](源码剖析/base_body.md)
-	* [base_body_part](源码剖析/base_body_part.md)
-	* [base_body_relation](源码剖析/base_body_relation.md)
-	* [base_particles](源码剖析/base_particles.md)
-	* [density summation](源码剖析/density%20summation.md)
-	* [dynamic algorithm](源码剖析/dynamic%20algorithm.md)
-	* [fluid integration](源码剖析/fluid%20integration.md)
-	* [fluid timestep](源码剖析/fluid%20timestep.md)
-	* [sphinxsys_variable](源码剖析/sphinxsys_variable.md)
+	* bodies
+		* [base_body](源码剖析/bodies/base_body.md)
+		* [base_body_part](源码剖析/bodies/base_body_part.md)
+	* body_relations
+		* [base_body_relation](源码剖析/body_relations/base_body_relation.md)
+	* common
+		* [sphinxsys_variable](源码剖析/common/sphinxsys_variable.md)
+	* particles
+		* [base_particles](源码剖析/particles/base_particles.md)
+	* particle_dynamics
+		* [dynamic algorithm](源码剖析/particle_dynamics/dynamic%20algorithm.md)
+		* [fluid_dynamics](源码剖析/particle_dynamics/fluid_dynamics.md)
+
+	* particle_generator
+		* [粒子生成](源码剖析/particle_generator/粒子生成.md)
 	* [SPHinXsys 中用到的标签派发技术](源码剖析/SPHinXsys中用到的标签派发技术.md)
-	* [transport velocity correction](源码剖析/transport%20velocity%20correction.md)
-	* [viscous dynamics](源码剖析/viscous%20dynamics.md)
 	* [从源码到范式：SPHinXsys 的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys%20的RAII所有权设计与指针策略.md)
-	* [粒子生成](源码剖析/粒子生成.md)
 * 其他
 	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)
 	* [写了个SPHinXsys的GDB扩展](其他/写了个SPHinXsys的GDB扩展.md)

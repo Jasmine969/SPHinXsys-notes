@@ -321,7 +321,9 @@ void DisposerOutflowDeletion::update(size_t index_i, Real dt)
 }
 ```
 
-在互斥锁保护下，检查当前粒子是否超出了disposer边界，以及当前粒子索引是否小于real particle的数目。如果是，则把这个粒子转为buffer particle。
+在互斥锁保护下，检查当前粒子是否超出了disposer边界，以及当前粒子索引是否小于real particle的数目。如果是，则把这个粒子转为buffer particle。结果是buffer particle数目加一，real particle数目减一。
+
+emitter消耗buffer particle，disposer又提供buffer particle，通过buffer particle和real particle的相互转换，有效地节省了内存空间。
 
 ## 深入探究
 
@@ -363,3 +365,23 @@ void BaseParticles::switchToBufferParticle(size_t index)
 注意，当我们删除粒子时，disposer的loop range并没有更改。因此，尽管real particle的数目已经变成了4998，while循环依旧会遍历到4998和4999。`index_i < particles_->TotalRealParticles()`的判断，避免了这里把buffer particle也删了（非预期行为）。现在我们回答了第二个问题（为什么要额外判断`index_i < particles_->TotalRealParticles()`）。
 
 补充一下，储存real particles的内存空间是连续的，储存buffer particles的内存空间也是连续的，并且buffer particle紧跟在real particle后面。因此每次删除粒子都是删最后一个real particle，而非直接把越界粒子删掉。这说明了交换粒子的必要性。
+
+# 定义数值方法
+
+## 壳体相关
+
+```cpp
+    InnerRelation shell_boundary_inner(shell_boundary);
+	...
+    InteractionDynamics<thin_structure_dynamics::ShellCorrectConfiguration> wall_corrected_configuration(shell_boundary_inner);
+```
+
+这行是在“定义一个壳体（shell）初始构型修正”的动力学算子，后面通过`wall_corrected_configuration.exec()`真正执行一次，用来给壳体粒子预计算/写入“构型修正矩阵”`B_`，主要服务于后续壳体的形变梯度/弯曲形变梯度/应力计算链路。但是这里壁面是固定不动的，所以这个关系的定义和修正其实是多余的。我们也可以认为它是个代码模板，如果后面改成可变性壁面，这里就需要修正了。
+
+```cpp
+    ShellInnerRelationWithContactKernel wall_curvature_inner(shell_boundary, water_block);
+	...
+    SimpleDynamics<thin_structure_dynamics::AverageShellCurvature> shell_curvature(wall_curvature_inner);
+```
+
+如[02_SPHinXsys二维槽道流案例注解](02_SPHinXsys二维槽道流案例注解.md)中介绍的，这行代码
