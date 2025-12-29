@@ -277,7 +277,7 @@ void EmitterInflowInjection::update(size_t original_index_i, Real dt)
 
 ## 定义
 
-流出盒子定义在$$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box。
+流出盒子定义在$$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByCell`类型）中读取body信息、粒子信息和获取aligned box。
 
 ```cpp
 void poiseuille_flow(...) {

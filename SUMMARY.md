@@ -43,6 +43,8 @@
 	* [从源码到范式：SPHinXsys的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys的RAII所有权设计与指针策略.md)
 	
 * 其他
-	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)
 	* [写了个SPHinXsys的GDB扩展](其他/写了个SPHinXsys的GDB扩展.md)
 	* [常见粒子属性的获取与输出](其他/常见粒子属性的获取与输出.md)
+	* [快速编译新案例](其他/快速编译新案例.md)
+	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)
+
