@@ -4,6 +4,8 @@
 
 SPHinXsys是一个强大的开源C++库，用于基于光滑粒子流体动力学（SPH）方法的多物理场仿真。它广泛应用于计算流体力学、固体力学和流固耦合等领域。SPHinXsys提供了丰富的功能和模块，支持高效的数值计算和复杂的物理现象模拟。
 
+然而，官方教程的案例已经过时，与最新版的SPHinXsys不匹配了，并且没有最新的API文档。在学习SPHinXsys的过程中，我认为它的学习曲线也较为陡峭。因此我认为有必要把我的学习笔记公开出来，让更多的人受益。
+
 对于任何问题和贡献，请在[GitHub仓库](https://github.com/Jasmine969/SPHinXsys-notes)中提出issue或pull request。
 
 Due to limited time, there is no English version for the time being. Volunteers are welcome to contribute translations.
