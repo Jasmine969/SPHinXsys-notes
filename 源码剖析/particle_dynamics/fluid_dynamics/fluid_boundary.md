@@ -136,6 +136,8 @@ Real operator()(Real p, Real current_time);
 
 源码中提供的是`NonPrescribedPressure`，即不指定压力。用户可以自定义，如`tests\extra_source_and_tests\test_2d_pulsatile_poiseuille_flow\pulsatile_poiseuille_flow.cpp`中的`LeftInflowPressure`和`RightInflowPressure`。
 
+
+
 # 流入/流出双向buffer
 
 在定常速度边界中，buffer区域通常是单向的入口或出口。压力边界就不一样了，流体可以从buffer一端进入流体内部区域，也可以从buffer另一端流出bounding box。为了实现这个特性，SPHinXsys定义了类`BidirectionalBuffer`，位于`tests\extra_source_and_tests\extra_src\shared\pressure_boundary\bidirectional_buffer.h`。可想而知，这个类需要满足以下特性：
