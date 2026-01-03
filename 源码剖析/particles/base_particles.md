@@ -62,19 +62,20 @@
 
 ## 5) 变量集合（用于“哪些变量会演化/哪些变量要输出”）
 
-| 变量名 | 含义 |
-| --- | --- |
-| `evolving_variables_` | 会随模拟演化、需要参与拷贝/重启读写的一组离散变量（变量对象集合）。 |
-| `variables_to_write_` | 需要写入输出的一组离散变量（变量对象集合）。 |
-| `all_discrete_variables_` / `all_singular_variables_` | 当前粒子上已注册的所有离散/单值变量集合（内部用于查找/管理）。 |
-| `all_state_data_` | “状态变量数据指针”汇总（不包含粒子 ID 那类 UnsignedInt 状态）。用于统一拷贝粒子状态等操作。 |
+| 变量名 | 含义 | 例子 |
+| --- | --- | --- |
+| `evolving_variables_` | 属于discrete variable。满足以下条件：1.需要在粒子排序时与粒子一起交换。2. 需要写入reload文件和restart文件。 | `"OriginalID"`, `"Position"`, `"VolumeMeasure"`。<br />对于fluid：`"Velocity"`, `"Mass"`, `"ForcePrior"`, `"Force"`, `"DensityChangeRate"`, `"Density"`, `"Pressure"`。 |
+| `variables_to_write_` | 属于discrete variable。需要写入输出的一组离散变量（变量对象集合）。 | `"OriginalId"`, `"SortedID"`。<br />对于fluid：`"Velocity"`。 |
+| `all_discrete_variables_` | 当前粒子上已注册的所有离散变量集合（内部用于查找/管理）。 | 所有`evolving_variables_`和`all_state_data_`都是。 |
+| `all_singular_variables_` | 当前粒子上已注册的所有单值变量集合（内部用于查找/管理）。 | `sv_total_real_particles_`, `"PhbysicalTime"`,`damping_rate_`。 |
+| `all_state_data_` | 属于discrete variable。“状态变量数据指针”汇总（不包含粒子 ID 那类`UnsignedInt`状态）。用于统一拷贝粒子状态等操作。 | `"Position"`, `"VolumeMeasure"`, `"Density"`, `"Mass"`。<br />对于fluid：`"Velocity"`, `"DensityChangeRate"`, `"ForcePrior"`, `"Force"`。 |
 
 ## 6) BodyPart（按粒子子集划分）
 
 | 变量名 | 含义 |
 | --- | --- |
-| `total_body_parts_` | body part 计数器，用于分配新 body part ID。 |
-| `body_parts_by_particle_` | 以粒子子集定义的 body part 列表。 |
+| `total_body_parts_` | body part计数器，用于分配新body part ID。 |
+| `body_parts_by_particle_` | 以粒子子集定义的body part列表。 |
 
 # 成员函数
 
@@ -82,7 +83,7 @@
 
 | 函数名 | 含义 |
 | --- | --- |
-| `BaseParticles(SPHBody&, BaseMaterial*)` | 构造：绑定 body/material，注册 `TotalRealParticles` 单值变量。 |
+| `BaseParticles(SPHBody&, BaseMaterial*)` | 构造：绑定body/material，注册 `TotalRealParticles` 单值变量。 |
 | `getSPHBody()` / `getBaseMaterial()` | 访问所属 body / material。 |
 | `getSPHAdaptation()` | 转发到 `sph_body_.getSPHAdaptation()`。 |
 | `printBodyName()` | 打印 body 名称。 |
@@ -103,7 +104,7 @@
 | 函数名 | 含义 |
 | --- | --- |
 | `initializeBasicParticleVariables()` | 注册/初始化基础变量：`Position`、`VolumetricMeasure`、`Density`、`Mass`、`OriginalID`、`SortedID` 等。 |
-| `registerPositionAndVolumetricMeasure(StdVec<Vecd>&, StdVec<Real>&)` | 直接从外部数组挂接 `Position/VolumetricMeasure`。 |
+| `registerPositionAndVolumetricMeasure(StdVec<Vecd>&, StdVec<Real>&)` | 直接从外部数组挂接`Position/VolumetricMeasure`。 |
 | `registerPositionAndVolumetricMeasureFromReload()` | 从 reload XML 中读取并注册 `Position/VolumetricMeasure`。 |
 | `dvParticlePosition()` | 获取 `Position` 变量对象指针。 |
 
