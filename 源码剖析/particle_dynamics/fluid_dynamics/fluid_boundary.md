@@ -1,8 +1,16 @@
 # 概览
 
-SPHinXsys中的流体边界条件很多都基于buffer思想：在边界附近定义一个box区域（`AlignedBox`），并通过body part机制只遍历该区域对应的粒子；对速度边界，通常是在该区域内对粒子速度做“松弛/投影”；对开边界（inflow/outflow），通常还要配合粒子注入/删除，并配套预留buffer particle内存。
+当我们在SPHinXsys中设定一个流体边界时，通常要同时指定两类东西：
 
-本文聚焦几个最常用的边界机制，源码主要位于`src\shared\particle_dynamics\fluid_dynamics\boundary_condition\fluid_boundary.h/.cpp`和`src\shared\particles\particle_reserve.h/.cpp`。
+1. 这是一个入口还是出口？或者既可以流入又可以流出？
+2. 设定边界压力还是速度？
+
+据此将流体边界分为两大类：
+
+1. 第一类是buffer，buffer是一个入口或出口的缓冲区（通常是`AlignedBox`）。通过body part机制只遍历该区域对应的粒子；对速度边界，通常是在该区域内对粒子速度做“松弛/投影”；对开边界（inflow/outflow），通常还要配合粒子注入/删除，并配套预留buffer particle内存。单向buffer包括用于流入的`EmitterInflowInjection`、用于流出的`DisposerOutflowDeletion`和既可流入又可流出的`BidirectionalBuffer`。
+2. 第二类用于设定粒子的属性。包括设定速度的`InflowVelocityCondition`、`TargetVelocity`和设定压力的`PressureBoundaryCondition`、`TargetPressure`。
+
+本文聚焦几个最常用的边界机制，源码主要位于`src\shared\particle_dynamics\fluid_dynamics\boundary_condition\fluid_boundary.h/.cpp`和`src\shared\particles\particle_reserve.h/.cpp`。这里我们关心如何在底层上实现，而不是如何使用。关于使用，请移步[案例注解](https://jasmine969.gitbook.io/jasmine969-docs/summary/an-li-zhu-jie)。
 
 注意区分本文的两个概念：buffer区域的粒子和buffer particle。前者指的是位于buffer区域（某个aligned box）的粒子，属于real particle。后者指的是内存空间中预留的空位置，属性没有任何意义，不属于real particle。
 
@@ -68,7 +76,7 @@ size_t sorted_index_i = sorted_id_[original_index_i];
 - `AlignedBoxByParticle`在tag时记录的是“当时的粒子索引”，这更接近original id语义；
 - 但粒子属性数组在很多配置里会按sorted顺序存取（粒子排序后），因此需要用`SortedID`把original id映射到当前的sorted index。
 
-## update逻辑（源码级）
+## update逻辑
 
 ![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20251226213505.png)
 
@@ -122,22 +130,6 @@ while (aligned_box_.checkUpperBound(pos_[index_i]) && index_i < particles_->Tota
 
 同时需要`index_i < TotalRealParticles()`这个条件：因为删除会动态减少real particle数量，而body part的loop range并不会在此处同步缩小，后续仍可能遍历到“已变成buffer particle的索引”，该判断可以避免误删/越界访问。
 
-# 压力边界：PressureBoundaryCondition
-
-类比于指定速度边界时我们需配合使用`InflowVelocityCondition`和`TargetVelocity`，在指定压力边界时，我们需要配合使用`PressureBoundaryCondition`和`TargetPressure`。
-
-## TargetPressure接口
-
-`TargetPressure`应当是一个函数对象，签名为：
-
-```cpp
-Real operator()(Real p, Real current_time);
-```
-
-源码中提供的是`NonPrescribedPressure`，即不指定压力。用户可以自定义，如`tests\extra_source_and_tests\test_2d_pulsatile_poiseuille_flow\pulsatile_poiseuille_flow.cpp`中的`LeftInflowPressure`和`RightInflowPressure`。
-
-
-
 # 流入/流出双向buffer
 
 在定常速度边界中，buffer区域通常是单向的入口或出口。压力边界就不一样了，流体可以从buffer一端进入流体内部区域，也可以从buffer另一端流出bounding box。为了实现这个特性，SPHinXsys定义了类`BidirectionalBuffer`，位于`tests\extra_source_and_tests\extra_src\shared\pressure_boundary\bidirectional_buffer.h`。可想而知，这个类需要满足以下特性：
@@ -150,7 +142,7 @@ Real operator()(Real p, Real current_time);
 
 下图是原始论文bidirectional buffer的解释（Zhang et al, 2025）：
 
-![](../../../static/bidirectional-buffer.png)
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20260104135813.png)
 
 `BidirectionalBuffer`的设计就是按照这三个特性来的：
 
@@ -285,9 +277,9 @@ class BidirectionalBuffer
     };
 ```
 
-`upper_bound_fringe_`是留给aligned box右边界的裕度，设为$0.5\Delta L$。如果一个粒子同时满足以下三个条件：
+`upper_bound_fringe_`是留给aligned box右边界的裕度，设为$$0.5\Delta L$$。如果一个粒子同时满足以下三个条件：
 
-1. 在轴线上的坐标超过了右边界+$0.5\Delta L$；
+1. 在轴线上的坐标超过了右边界+$$0.5\Delta L$$；
 2. 它在上一个时间步属于这个buffer区域
 3. 它是real particle（感觉这个判断也有点多余，如果不是real particle的话就几乎不会被遍历到了）
 
@@ -338,6 +330,126 @@ class BidirectionalBuffer
 3. 是real particle
 
 那么就将其删除（转为buffer particle）。
+
+# 压力边界：PressureBoundaryCondition
+
+类比于指定速度边界时我们需配合使用`InflowVelocityCondition`和`TargetVelocity`，在指定压力边界时，我们需要配合使用`PressureBoundaryCondition`和`TargetPressure`。
+
+## TargetPressure接口
+
+`TargetPressure`应当是一个函数对象，签名为：
+
+```cpp
+Real operator()(Real p, Real current_time);
+```
+
+源码中提供的是`NonPrescribedPressure`，即不指定压力。用户可以自定义，如`tests\extra_source_and_tests\test_2d_pulsatile_poiseuille_flow\pulsatile_poiseuille_flow.cpp`中的`LeftInflowPressure`和`RightInflowPressure`。
+
+## 压力边界
+
+### 理论
+
+为了使得内部流动区域的流体粒子具有完整的支撑域，buffer区域至少要有三层粒子。可是buffer区域边缘的粒子就没办法保证有完整的支撑域了。然而边界的流速计算依赖于压力梯度的计算（动量方程），所以“如何使得边界上没有完整支撑域的粒子也能计算出正确的压力梯度”就是个要重点解决的问题，也是Zhang et al（2025）主要解决的问题。在其论文中，假想buffer区域之外有一堆粒子，如果这些假想的粒子存在，那么buffer区域的粒子的支撑域就完整了。可这些假想粒子实际上是缺失的。作者通过一些巧妙的数学变换，使得在这些粒子缺失的情况下也能正确考虑它们的影响。
+
+![](https://fengimages-1310812903.cos.ap-shanghai.myqcloud.com/20260104121948.png)
+
+首先，根据梯度的反对称性，有以下近似（前提是粒子均匀分布）：
+$$
+\sum_j \frac{m_j}{\rho_j}\nabla W_{ij}\approx \boldsymbol{0}.
+$$
+对buffer区域的粒子来说，如果算上边界外缺失的粒子，那么上式依然成立。我们记buffer区域的粒子下标为$$j$$，缺失粒子的下标为$$k$$，于是
+$$
+\sum_j \frac{m_j}{\rho_j} \nabla W_{i j}+\sum_k \frac{m_k}{\rho_k} \nabla W_{i k} \approx \boldsymbol{0}.
+$$
+
+$$
+\sum_k \frac{m_k}{\rho_k} \nabla W_{i k}\approx -\sum_j \frac{m_j}{\rho_j} \nabla W_{i j}.\tag{1}
+$$
+
+SPHinXsys使用Riemann solver进行物理场的稳定。对于buffer区域粒子，带有Riemann solver的压力梯度离散形式为
+$$
+\nabla p_i=2 \sum_j P_{i j}^* \frac{m_j}{\rho_j} \nabla W_{i j}+2 \sum_k P_{i k}^* \frac{m_k}{\rho_k} \nabla W_{i k},
+$$
+其中$$P^*$$是任意两个粒子对的压力Riemann solution。
+
+对于边界外的粒子，我们指定它具有恒定的压力$$p_\mathrm{b}$$（第一类边界条件），也即$$P_{i k}^*=p_\mathrm{b}$$。结合式(1)，可以得出
+$$
+\nabla p_i=2 \sum_j P_{i j}^* \frac{m_j}{\rho_j} \nabla W_{i j}-2 p_\mathrm{b} \sum_j \frac{m_j}{\rho_j} \nabla W_{i j} .
+$$
+将其代入动量方程的离散形式：
+$$
+\begin{aligned}
+\frac{d \mathbf{v}_i}{d t}= & -2 \sum_j m_j\left(\frac{P_{i j}^*}{\rho_i \rho_j}\right) \nabla W_{i j}+2 p_\mathrm{b} \sum_j\left(\frac{m_j}{\rho_i \rho_j}\right) \nabla W_{i j} \\
+& +2 \sum_j m_j \frac{\eta \mathbf{v}_{i j}}{\rho_i \rho_j r_{i j}} \frac{\partial W_{i j}}{\partial r_{i j}}+\mathbf{g} .
+\end{aligned}\tag{2}
+$$
+注意，动量方程中多出的一项是`PressureBoundaryCondition`干的第一件事（也是最重要的）：
+$$
+2 p_\mathrm{b} \sum_j\left(\frac{m_j}{\rho_i \rho_j}\right) \nabla W_{i j}
+$$
+它干的第二件事，是令速度只有边界的法向分量，没有切向分量，也就是做了个投影：
+$$
+\mathbf{v}_i=\left(\mathbf{v}_i \cdot \hat{u}\right) \hat{u},
+$$
+其中$$\hat{u}$$是buffer区域边界的单位法向量。
+
+### 实现
+
+```cpp
+template <typename TargetPressure, class KernelCorrectionType>
+class PressureBoundaryCondition : public BaseFlowBoundaryCondition
+{
+  public:
+    /** default parameter indicates prescribe pressure */
+    explicit PressureBoundaryCondition(AlignedBoxByCell &aligned_box_part)
+        : BaseFlowBoundaryCondition(aligned_box_part),
+          aligned_box_(aligned_box_part.getAlignedBox()),
+          alignment_axis_(aligned_box_.AlignmentAxis()),
+          transform_(aligned_box_.getTransform()),
+          target_pressure_(*this),
+          kernel_sum_(particles_->getVariableDataByName<Vecd>("KernelSummation")),
+          kernel_correction_(this->particles_),
+          physical_time_(sph_system_.getSystemVariableDataByName<Real>("PhysicalTime")) {};
+    virtual ~PressureBoundaryCondition() {};
+    AlignedBox &getAlignedBox() { return aligned_box_; };
+
+    void update(size_t index_i, Real dt = 0.0)
+    {
+        if (aligned_box_.checkContain(pos_[index_i]))
+        {
+            vel_[index_i] += 2.0 * kernel_correction_(index_i) * kernel_sum_[index_i] * target_pressure_(p_[index_i], *physical_time_) / rho_[index_i] * dt;
+
+            Vecd frame_velocity = Vecd::Zero();
+            frame_velocity[alignment_axis_] = transform_.xformBaseVecToFrame(vel_[index_i])[alignment_axis_];
+            vel_[index_i] = transform_.xformFrameVecToBase(frame_velocity);
+        }
+    };
+
+  protected:
+    AlignedBox &aligned_box_;
+    const int alignment_axis_;
+    Transform &transform_;
+    TargetPressure target_pressure_;
+    Vecd *kernel_sum_;
+    KernelCorrectionType kernel_correction_;
+    Real *physical_time_;
+};
+```
+
+构造函数接收一个`AlignedBoxByCell`对象，从中获取aligned box、轴线方向和变换，初始化了`kernel_sum_`。这里`kernel_sum_`就是$$\sum_j (m_j/\rho_j)\nabla W_{ij}$$。`update`函数中，如果粒子位于aligned box之内，那么依次执行
+
+1. 速度递增$$2 p_\mathrm{b} \sum_j m_j/(\rho_i \rho_j) \nabla W_{i j}$$，如需要修正核函数梯度，施加之；
+2. 只保留速度的法向分量。这里有三行代码，看着多，实际上是为了处理有旋转变换的情况（aligned box与坐标轴不对齐）。
+
+调用时，可以根据是否需要修正核梯度，调用以下两个别名：
+
+```cpp
+template <typename TargetPressure>
+using PressureCondition = PressureBoundaryCondition<TargetPressure, NoKernelCorrection>;
+
+template <typename TargetPressure>
+using PressureConditionCorrection = PressureBoundaryCondition<TargetPressure, LinearGradientCorrection>;
+```
 
 # 参考文献
 
