@@ -4,12 +4,35 @@
 
 # Inner分支（同一流体体内的相互作用）
 
+按照下式更新密度：
+$$
+\rho_i=\rho_0\frac{\sum_j W_{ij}}{\sum_j W_{ij}^{0}}
+$$
+其中$$W_{ij}^{0}$$为初始时刻（严格来说是精确按照`Lattice`排布）的核函数值。
+
 实例`DensitySummation<Inner<Base>>`：所有`Inner`版本的基类。只是把委托类型固定为`DataDelegateInner`。
 
 - 实例`DensitySummation<Inner<>>`：别名`DensitySummationInner`。实现了`interaction()`+`update()`。是最常用的 inner密度求和。
 - 实例`DensitySummation<Inner<Adaptive>>`。实现了`interaction()`+`update()`（带变光滑长度/自适应修正）。
 
 # Contact分支（与接触体/多体接触相互作用）
+
+在Inner分支基础上添加了一项，用下标f表示流体：
+$$
+\begin{aligned}
+\rho_i&=\rho_{f0}\frac{\sum_j W_{ij}}{\sum_j W_{ij}^{0}}+\frac{{\rho_{f0}}^2}{m_i}\frac{\sum_k W_{ik}m_k/\rho_{k0}}{\sum_j W_{ij}^0}\\
+&=\frac{\rho_{f0}}{\sum_j W_{ij}^0}\left(\sum_j W_{ij}+\frac{\rho_{f0}}{m_i}\sum_k \frac{W_{ik}m_k}{\rho_{k0}}\right)
+\end{aligned}
+$$
+这里下标$$j$$表示某个流体粒子，下标$$k$$表示某个接触体粒子。假设只有一种接触体，那么$$\rho_{k0}$$和$$m_k$$是常数，我们有
+$$
+\begin{aligned}
+\rho_i&=\frac{\rho_{f0}}{\sum_j W_{ij}^0}\left(\sum_j W_{ij}+\frac{\rho_{f0}m_k}{m_i\rho_{k0}}\sum_k W_{ik}\right)\\
+&=\frac{\rho_{f0}}{\sum_j W_{ij}^0}\left(\sum_j W_{ij}+\frac{V_{k0}}{V_{j0}}\sum_k W_{ik}\right)
+\end{aligned}
+$$
+
+所以接触体的density summation实际上是乘了一个体积的权重。如果所有粒子都是相同间距，那么Contact分支和Inner分支就一模一样了。**流体粒子的density summation与壁面粒子的密度实际上是无关的，只与体积有关**。所以即使壁面是密度很大的材料，也不会使得流体在做完density summation后密度偏高。
 
 实例`DensitySummation<Contact<Base>>`：所有`contact`版本的基类。把委托类型固定为`DataDelegateContact`。缓存接触体信息：`contact_inv_rho0_`、`contact_mass_`。提供`ContactSummation(index_i)`：对所有contact邻域做一遍密度求和。
 
@@ -53,3 +76,20 @@ using BaseDensitySummationComplex = ComplexInteraction<DensitySummation<InnerInt
 - `using DensitySummationFreeStreamComplexAdaptive = BaseDensitySummationComplex<Inner<FreeStream, Adaptive>, Contact<Adaptive>>;`
 - `using DensitySummationNotNearSurfaceComplex = BaseDensitySummationComplex<Inner<NotNearSurface>, Contact<>>;`
 
+# 针对压力边界的版本
+
+设置压力边界时，一般会同步设置`BidirectionalBuffer`。density summation默认针对所有流体粒子。但是在buffer区域中的粒子使用target pressure更新密度：
+$$
+\rho_i=p_\mathrm{b}/c^2+\rho_0
+$$
+所以需要对默认的density summation做一个改进——识别粒子是否为内部流动区域的粒子，只有当条件满足时，才做density summation。见`tests\extra_source_and_tests\extra_src\shared\pressure_boundary\density_correciton.h`：
+
+```cpp
+    void DensitySummationPressure<Inner<>>::update(size_t index_i, Real dt = 0.0)
+    {
+        if (buffer_indicator_[index_i] == 0)
+            assignDensity(index_i);
+    };
+```
+
+其中`assignDensity(index_i)`做的是`rho_[index_i] = rho_sum_[index_i];`。

@@ -109,3 +109,38 @@ struct RightInflowPressure
 3. 在中层循环中进行粒子删除；
 4. 在中层循环中、更新邻居表之后，进行buffer区域粒子的重新标记。
 
+# 压力边界
+
+底层的具体实现见[fluid_boundary](../源码剖析/particle_dynamics/fluid_dynamics/fluid_boundary.md)。用户只需要知道压力边界主要做的事是在动量方程中加入一项$$2 p_\mathrm{b} \sum_j m_j/(\rho_i \rho_j) \nabla W_{i j}$$，由此我们能看出需要提供三个东西：
+
+1. 目标压力$$p_\mathrm{b}$$，由`TargetPressure`作为模板参数提供。这里是`LeftInflowPressure`和`RightInflowPressure`。
+2. 邻居粒子的核梯度之和$$\sum_j (m_j/\rho_j)\nabla W_{ij}$$，`PressureCondition`会在底层调用之。这里由`kernel_summation`提供。因此`kernel_summation.exec()`必须放在`...inflow_pressure_condition.exec(dt)`之前。
+3. 这一项是加到动量方程中的，因此`pressure_relaxation.exec(dt)`必须放在`...inflow_pressure_condition.exec(dt)`之前。
+
+```cpp
+	InteractionDynamics<NablaWVComplex> kernel_summation(water_block_inner, water_block_contact);
+	...
+    SimpleDynamics<fluid_dynamics::PressureCondition<LeftInflowPressure>> left_inflow_pressure_condition(left_emitter);
+    SimpleDynamics<fluid_dynamics::PressureCondition<RightInflowPressure>> right_inflow_pressure_condition(right_emitter);
+	...
+    while (physical_time < end_time)
+    {
+        ...
+        while (integration_time < Output_Time)
+        {
+            ...
+            while (relaxation_time < Dt)
+            {
+                ...
+                pressure_relaxation.exec(dt);
+                kernel_summation.exec();
+                left_inflow_pressure_condition.exec(dt);
+                right_inflow_pressure_condition.exec(dt);
+                density_relaxation.exec(dt);
+				...
+            }
+            ...
+        }
+    }
+```
+
