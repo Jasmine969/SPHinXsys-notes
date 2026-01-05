@@ -20,14 +20,14 @@ $$
 在Inner分支基础上添加了一项，用下标f表示流体：
 $$
 \begin{aligned}
-\rho_i&=\rho_{f0}\frac{\sum_j W_{ij}}{\sum_j W_{ij}^{0}}+\frac{{\rho_{f0}}^2}{m_i}\frac{\sum_k W_{ik}m_k/\rho_{k0}}{\sum_j W_{ij}^0}\\
+\langle\rho_i\rangle&=\rho_{f0}\frac{\sum_j W_{ij}}{\sum_j W_{ij}^{0}}+\frac{{\rho_{f0}}^2}{m_i}\frac{\sum_k W_{ik}m_k/\rho_{k0}}{\sum_j W_{ij}^0}\\
 &=\frac{\rho_{f0}}{\sum_j W_{ij}^0}\left(\sum_j W_{ij}+\frac{\rho_{f0}}{m_i}\sum_k \frac{W_{ik}m_k}{\rho_{k0}}\right)
 \end{aligned}
 $$
 这里下标$$j$$表示某个流体粒子，下标$$k$$表示某个接触体粒子。假设只有一种接触体，那么$$\rho_{k0}$$和$$m_k$$是常数，我们有
 $$
 \begin{aligned}
-\rho_i&=\frac{\rho_{f0}}{\sum_j W_{ij}^0}\left(\sum_j W_{ij}+\frac{\rho_{f0}m_k}{m_i\rho_{k0}}\sum_k W_{ik}\right)\\
+\langle\rho_i\rangle&=\frac{\rho_{f0}}{\sum_j W_{ij}^0}\left(\sum_j W_{ij}+\frac{\rho_{f0}m_k}{m_i\rho_{k0}}\sum_k W_{ik}\right)\\
 &=\frac{\rho_{f0}}{\sum_j W_{ij}^0}\left(\sum_j W_{ij}+\frac{V_{k0}}{V_{j0}}\sum_k W_{ik}\right)
 \end{aligned}
 $$
@@ -43,22 +43,53 @@ $$
 
 # FreeSurface/NearSurface叠加分支（只改update规则）
 
+`SummationType`可以是空或者`Adaptive`。
+
 模板`DensitySummation<Inner<FreeSurface, SummationType...>>`：继承自`DensitySummation<Inner<SummationType...>>`。只实现`update()：rho = max(rho_sum, rho0)`（避免自由面处不合理低密度）。
 
 - 实例`using DensitySummationFreeSurfaceInner = DensitySummation<Inner<FreeSurface>>;`。这里`SummationType`是空。
+  $$
+  \langle\rho_i\rangle=\max\left\{\rho_0\frac{\sum_j W_{ij}}{\sum_j W_{ij}^{0}}, \rho_0\right\}
+  $$
 
 `FreeStream`与`NotNearSurface`：两个“NearSurfaceType policy functor”
 
-- `NotNearSurface`：近表面就直接返回`rho`（相当于保持原值，不用`rho_sum`）
-- `FreeStream`：如果`rho_sum < rho`，按比例把缺口补一点（更“温和”的自由流修正）
+- `NotNearSurface`：近表面就直接返回`rho`（相当于保持原值，不用`rho_sum`）。
+- `FreeStream`：如果`rho_sum < rho`，按比例把缺口补一点（更“温和”的自由流修正）——`rho_sum + SMAX(Real(0), (rho - rho_sum)) * rho0 / rho`。
 
 模板`DensitySummation<Inner<NearSurfaceType, SummationType...>>`：`NearSurfaceType`指的是`FreeStream`和`NotNearSurface`。只实现`update()`：如果“靠近自由面”则用`near_surface_rho_(rho_sum,rho0,rho)`，否则用`rho_sum`
 通过粒子变量`Indicator`+内邻域判断`isNearFreeSurface(i)`只要邻居里有`Indicator==1`就认为near surface）
 
 - 实例`using DensitySummationInnerNotNearSurface = DensitySummation<Inner<NotNearSurface>>;`
-- 实例`using DensitySummationInnerFreeStream = DensitySummation<Inner<FreeStream>>;`
 
-# 复合类型（Inner+Contact 的组合）
+- 实例`using DensitySummationInnerFreeStream = DensitySummation<Inner<FreeStream>>;`
+  $$
+  \rho_i^\mathrm{sum}=\rho_0\frac{\sum_j W_{ij}}{\sum_j W_{ij}^{0}}
+  $$
+  
+  $$
+  \langle\rho_i\rangle=\begin{cases}
+  \rho_i^\mathrm{sum}+\max\{0,\rho_i-\rho_i^\mathrm{sum}\}\rho_0/\rho_i,& i\text{ has free surface neighbor(s)};\\
+  \rho_i^\mathrm{sum},& \text{else}.
+  \end{cases}
+  $$
+  
+  等价于
+  $$
+  \langle\rho_i\rangle=\begin{cases}
+	\rho_i^\mathrm{sum},& i\text{ has no free surface neighbor or   }\rho_i < \rho_i^\mathrm{sum};\\
+  \rho_i^\mathrm{sum}(1-\rho_0/\rho_i)+\rho_0,& \text{else}.\\
+  
+  \end{cases}
+  $$
+  对于表面粒子或者近表面粒子，一般会有
+
+  1. $$\rho_0>\rho_i$$，于是$$\langle\rho_i\rangle<\rho_0$$。
+  2. $$\rho_i > \rho_i^\mathrm{sum}$$，于是$$\langle\rho_i\rangle >   \rho_i^\mathrm{sum}$$。
+
+  也即$$\rho_i^\mathrm{sum} < \langle\rho_i\rangle < \rho_0$$。所以我们可以认为`FreeStream`类型的density summation将边界粒子的$$\langle\rho_i\rangle$$拉高了一些，但没有像`FreeSurface`类型那样直接拉高到参考密度，因此这是一种更软的处理。
+
+# 复合类型（Inner+Contact的组合）
 
 复合类型的基类：
 

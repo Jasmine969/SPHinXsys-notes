@@ -67,7 +67,7 @@
 
 | 变量名 | 含义 |
 | --- | --- |
-| `h_spacing_ratio_` | 参考核光滑长度与粒子间距的比值 $h/\Delta x$（默认 1.3）。 |
+| `h_spacing_ratio_` | 参考核光滑长度与粒子间距的比值 $$h/\Delta x$$（默认 1.3）。 |
 | `system_refinement_ratio_` | system resolution 相对 body resolution 的比例（默认 1.0）。 |
 | `local_refinement_level_` | 局部加密层级（默认 0）。 |
 | `spacing_ref_` | body 的参考粒子间距：`resolution_ref / system_refinement_ratio_`。 |
@@ -82,7 +82,7 @@
 
 | 变量名 | 含义 |
 | --- | --- |
-| `Real *h_ratio_` | 每粒子的 `SmoothingLengthRatio` 数据指针：$h_{ref}/h_i$（注意：此处语义是“参考光滑长度相对当前光滑长度的比例”）。 |
+| `Real *h_ratio_` | 每粒子的 `SmoothingLengthRatio` 数据指针：$$h_\mathrm{ref}/h_i$$（注意：此处语义是“参考光滑长度相对当前光滑长度的比例”）。 |
 | `int *level_` | 每粒子的 `ParticleMeshLevel`：其应落在哪一层 cell linked list 网格。 |
 | `finest_spacing_bound_` | 最细粒子间距的界（`spacing_min_ + Eps`）。 |
 | `coarsest_spacing_bound_` | 最粗粒子间距的界（`spacing_ref_ - Eps`）。 |
@@ -146,7 +146,7 @@
 
 `total_levels = (int)log10(MinimumDimension(bounds)/ReferenceSpacing()) + 2`
 
-这不是 $\log_2$，而是 $\log_{10}$，它更像一个经验估算（与 cell linked list 的层数并不严格对应）。理解时以“给 level set 足够层级覆盖从 coarse 到 fine”即可。
+这不是 $$\log_2$$，而是 $$\log_{10}$$，它更像一个经验估算（与 cell linked list 的层数并不严格对应）。理解时以“给 level set 足够层级覆盖从 coarse 到 fine”即可。
 
 ## 5) 局部加密派生类：ParticleWithLocalRefinement
 
@@ -220,7 +220,7 @@ adaptation 本身不直接“持有粒子数组”，但它通过 `initializeAda
 
 1. **`AdaptiveSmoothingLength(BaseParticles&)` 仅在头文件声明**：在当前仓库版本中未找到其实现（全仓库搜索只有声明）。因此文档中不建议依赖它；若你在上游版本见到实现，应以对应版本源码为准。
 2. **局部 refinement 需要粒子变量存在**：若某些模块假定存在 `SmoothingLengthRatio`（例如自适应邻域搜索），则必须使用 `ParticleWithLocalRefinement` 或手动注册同名变量，否则 `getVariableDataByName` 会直接报错退出。
-3. **`SmoothingLengthRatio` 的语义要统一**：该变量在代码中被当作 $h_{ref}/h_i$ 使用；同时 cutoff 与权重接口以“ratio”传入核函数。自定义核或自定义更新策略时要避免把它当成 $h_i/h_{ref}$。
+3. **`SmoothingLengthRatio` 的语义要统一**：该变量在代码中被当作 $$h_\mathrm{ref}/h_i$$ 使用；同时 cutoff 与权重接口以“ratio”传入核函数。自定义核或自定义更新策略时要避免把它当成 $$h_i/h_\mathrm{ref}$$。
 
 # 常见用法（调用范式）
 

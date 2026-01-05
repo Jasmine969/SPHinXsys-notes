@@ -39,8 +39,7 @@
 
 - `AllParticles`：全体粒子都修正
 - `BulkParticles`：`IndicatedParticles<0>`，只修正`Indicator==0`的“体内/主体”粒子（常用于排除`buffer/open boundary`粒子）
-- `IndicatedParticles<k> / NotIndicatedParticles<k>`：按`Indicator`筛选
-  代码里所有 interaction/update 都先判断 within_scope_(index_i)，不在范围内就跳过
+- `IndicatedParticles<k> / NotIndicatedParticles<k>`：按`Indicator`筛选。代码里所有 interaction/update 都先判断 within_scope_(index_i)，不在范围内就跳过
 
 ## 核梯度修正KernelCorrectionType
 

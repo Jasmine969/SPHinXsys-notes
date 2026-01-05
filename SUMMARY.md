@@ -1,24 +1,20 @@
 ## Summary
 
 * [SPHinXsys notes of Jasmine Feng](README.md)
-
 * [安装](安装/源码编译安装SPHinXsys.md)
-
 * 案例注解
 	* [01 二维溃坝案例注解](案例注解/01_SPHinXsys二维溃坝案例注解.md)
 	* [02 二维槽道流案例注解](案例注解/02_SPHinXsys二维槽道流案例注解.md)
 	* [03 三维圆管泊肃叶流动案例注解](案例注解/03_SPHinXsys三维圆管泊肃叶流动案例注解.md)
 	* [04 二维脉动泊肃叶流动案例注解](案例注解/04_SPHinXsys二维脉动泊肃叶流动案例注解.md)
-	
 * 用户指南
     * [快速编译新案例](用户指南/快速编译新案例.md)
     * [常见粒子属性的获取与输出](用户指南/常见粒子属性的获取与输出.md)
     * [几何创建](用户指南/几何创建.md)
     * [指定物体运动或变形](用户指南/指定物体运动或变形.md)
     * [如何在精确的时间步输出粒子信息到VTP文件](用户指南/如何在精确的时间步输出粒子信息到VTP文件.md)
-    
 * [算法](算法/算法.md)
-
+    * [边界截断问题的解决](算法/边界截断问题的解决.md)
 * 源码剖析
 
   * [adaptation](源码剖析/adaptation.md)
@@ -52,7 +48,6 @@
   * [SPHinXsys 中用到的标签派发技术](源码剖析/SPHinXsys中用到的标签派发技术.md)
 
   * [从源码到范式：SPHinXsys的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys的RAII所有权设计与指针策略.md)
-
 * 其他
 	* [写了个SPHinXsys的GDB扩展](其他/写了个SPHinXsys的GDB扩展.md)
 	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)
