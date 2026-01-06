@@ -9,7 +9,7 @@
 
 # TargetPressure
 
-用于指定压力。这个类是一个函数对象，具有以下签名：
+用于指定压力。这个类是一个函数对象，具有如下签名：
 
 ```cpp
 Real TargetPressure::operator()(Real p, Real current_time);
