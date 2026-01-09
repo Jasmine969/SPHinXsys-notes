@@ -363,7 +363,7 @@ $$
 $$
 
 $$
-\sum_k \frac{m_k}{\rho_k} \nabla W_{i k}\approx -\sum_j \frac{m_j}{\rho_j} \nabla W_{i j}.\tag{1}
+\boxed{\sum_k \frac{m_k}{\rho_k} \nabla W_{i k}\approx -\sum_j \frac{m_j}{\rho_j} \nabla W_{i j}.}\tag{1}
 $$
 
 SPHinXsys使用Riemann solver进行物理场的稳定。对于buffer区域粒子，带有Riemann solver的压力梯度离散形式为
@@ -379,7 +379,7 @@ $$
 将其代入动量方程的离散形式：
 $$
 \begin{aligned}
-\frac{d \mathbf{v}_i}{d t}= & -2 \sum_j m_j\left(\frac{P_{i j}^*}{\rho_i \rho_j}\right) \nabla W_{i j}+2 p_\mathrm{b} \sum_j\left(\frac{m_j}{\rho_i \rho_j}\right) \nabla W_{i j} \\
+\frac{d \mathbf{v}_i}{d t}= & -2 \sum_j m_j\left(\frac{P_{i j}^*}{\rho_i \rho_j}\right) \nabla W_{i j}+\boxed{2 p_\mathrm{b} \sum_j\left(\frac{m_j}{\rho_i \rho_j}\right) \nabla W_{i j}} \\
 & +2 \sum_j m_j \frac{\eta \mathbf{v}_{i j}}{\rho_i \rho_j r_{i j}} \frac{\partial W_{i j}}{\partial r_{i j}}+\mathbf{g} .
 \end{aligned}\tag{2}
 $$
