@@ -41,6 +41,9 @@
   	  * [force_prior](源码剖析/particle_dynamics/general_dynamics/force_prior.md)
   * particle_generator
   	* [粒子生成](源码剖析/particle_generator/粒子生成.md)
+  * physical_closure
+  	- materials
+  	  - [elastic_solid](源码剖析/physical_closure/materials/elastic_solid.md)
   * [SPHinXsys 中用到的标签派发技术](源码剖析/SPHinXsys中用到的标签派发技术.md)
   * [从源码到范式：SPHinXsys的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys的RAII所有权设计与指针策略.md)
 * 其他
