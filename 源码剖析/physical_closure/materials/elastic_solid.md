@@ -11,23 +11,23 @@
 
 ## 2.符号与张量（与实现一致）
 
-- $F$：`deformation`，变形梯度。
-- $J=\det(F)$：体积比。
-- $C=F^TF$：RightCauchy-Green张量。
-- $b=FF^T$：LeftCauchy-Green张量。
-- $E=\frac12(C-I)$：Green-Lagrange应变。
-- $e=\frac12\left(I-(FF^T)^{-1}\right)$：EulerianAlmansi应变（代码里通过$F$构造）。
+- $$F$$：`deformation`，变形梯度。
+- $$J=\det(F)$$：体积比。
+- $$C=F^TF$$：RightCauchy-Green张量。
+- $$b=FF^T$$：LeftCauchy-Green张量。
+- $$E=\frac12(C-I)$$：Green-Lagrange应变。
+- $$e=\frac12\left(I-(FF^T)^{-1}\right)$$：EulerianAlmansi应变（代码里通过$$F$$构造）。
 - 应力度量：
-  - PK1：$P$，一阶Piola-Kirchhoff应力。
-  - PK2：$S$，二阶Piola-Kirchhoff应力。
-  - Cauchy：$\sigma$。
-  - Kirchhoff：$\tau=J\,\sigma$。
+  - PK1：$$P$$，一阶Piola-Kirchhoff应力。
+  - PK2：$$S$$，二阶Piola-Kirchhoff应力。
+  - Cauchy：$$\sigma$$。
+  - Kirchhoff：$$\tau=J\,\sigma$$。
 
 在固体动力学里常用的换算（见`elastic_dynamics.cpp`）：
 
-- 由PK2到PK1：$P=F\,S$。
-- 由Cauchy到PK1：$P=J\,\sigma\,F^{-T}$。
-- Kirchhoff分解形式：$P=(\tau)F^{-T}$，其中$\tau=\tau_{vol}I+\tau_{dev}$。
+- 由PK2到PK1：$$P=F\,S$$。
+- 由Cauchy到PK1：$$P=J\,\sigma\,F^{-T}$$。
+- Kirchhoff分解形式：$$P=(\tau)F^{-T}$$，其中$$\tau=\tau_{vol}I+\tau_{dev}$$。
 
 ## 3.ElasticSolid（抽象基类）
 
@@ -35,9 +35,9 @@
 
 成员（均为reference/初始常量意义）：
 
-- $\rho_0$：密度（来自`Solid`基类中的`rho0_`）。
-- $E_0,G_0,K_0,\nu$：杨氏模量、剪切模量、体积模量、泊松比（对应`E0_`、`G0_`、`K0_`、`nu_`）。
-- $c_0,c_{t0},c_{s0}$：声速/拉伸波速/剪切波速（对应`c0_`、`ct0_`、`cs0_`）。
+- $$\rho_0$$：密度（来自`Solid`基类中的`rho0_`）。
+- $$E_0,G_0,K_0,\nu$$：杨氏模量、剪切模量、体积模量、泊松比（对应`E0_`、`G0_`、`K0_`、`nu_`）。
+- $$c_0,c_{t0},c_{s0}$$：声速/拉伸波速/剪切波速（对应`c0_`、`ct0_`、`cs0_`）。
 
 代码中`setSoundSpeeds()`：
 
@@ -61,13 +61,13 @@ $$
 	au_{dev}=G_0\,\text{deviatoric\_be}
 $$
 
-其中`deviatoric_be`来自动力学模块对归一化$b$的去迹部分：
+其中`deviatoric_be`来自动力学模块对归一化$$b$$的去迹部分：
 
 $$
 \bar b = J^{-2/d} b,\quad \text{deviatoric\_be}=\bar b-\frac{\mathrm{tr}(\bar b)}{d}I
 $$
 
-- `VolumetricKirchhoff(J)`：由子类定义$\tau_{vol}$。
+- `VolumetricKirchhoff(J)`：由子类定义$$\tau_{vol}$$。
 
 ### 3.4数值耗散
 
@@ -77,19 +77,19 @@ $$
 ext{damping}=\frac12\rho_0 c_0\,\dot E_{ij}\,h
 $$
 
-- `NumericalDampingRightCauchy`/`NumericalDampingLeftCauchy`：用$\dot F$构造应变率并分离法向/剪切部分，返回一个“应力型”阻尼项，比例系数包含$\rho_0,c_0,c_{s0}$。
+- `NumericalDampingRightCauchy`/`NumericalDampingLeftCauchy`：用$$\dot F$$构造应变率并分离法向/剪切部分，返回一个“应力型”阻尼项，比例系数包含$$\rho_0,c_0,c_{s0}$$。
 
 ## 4.LinearElasticSolid（各向同性线弹性）
 
 ### 4.1 参数换算
 
-构造函数输入$(\rho_0,E,\nu)$，代码计算：
+构造函数输入$$(\rho_0,E,\nu)$$，代码计算：
 
 $$
 K_0=\frac{E}{3(1-2\nu)},\quad G_0=\frac{E}{2(1+\nu)},\quad \lambda_0=\frac{\nu E}{(1+\nu)(1-2\nu)}
 $$
 
-其中$\lambda_0$是第一Lame系数。
+其中$$\lambda_0$$是第一Lame系数。
 
 ### 4.2本构公式（实现细节很重要）
 
@@ -105,7 +105,7 @@ $$
 S=\lambda_0\,\mathrm{tr}(\varepsilon)I+2G_0\varepsilon
 $$
 
-- `StressPK1(F)`：$P=FS$。
+- `StressPK1(F)`：$$P=FS$$。
 - `StressCauchy(almansi)`：同样的线弹性形式
 
 $$
@@ -120,7 +120,7 @@ $$
 
 ### 4.3 适用范围
 
-- 适合小变形、小转动（因为应变用$\frac12(F^T+F)-I$，并不是严格的有限变形形式）。
+- 适合小变形、小转动（因为应变用$$\frac12(F^T+F)-I$$，并不是严格的有限变形形式）。
 - 如果存在较大旋转或大拉伸，建议用SVK/Neo-Hookean等超弹性。
 
 `getRelevantStressMeasureName()`返回`PK2`，默认更偏向在Lagrangian框架做后处理。
@@ -145,9 +145,9 @@ $$
 
 ### 6.1 `StressPK2(F)`
 
-代码实现（并注明允许$\det(F)$为负，参考Smith2018的StableNeo-Hookean思路）：
+代码实现（并注明允许$$\det(F)$$为负，参考Smith2018的StableNeo-Hookean思路）：
 
-令$C=F^TF,J=\det(F)$，则
+令$$C=F^TF,J=\det(F)$$，则
 
 $$
 S=G_0 I+\left(\lambda_0(J-1)-G_0\right)J\,C^{-1}
@@ -155,7 +155,7 @@ $$
 
 ### 6.2`StressCauchy(almansi)`
 
-代码从Almansi应变反解$B$：
+代码从Almansi应变反解$$B$$：
 
 $$
 B=\left(-2e+I\right)^{-1},\quad J=\sqrt{\det(B)}
@@ -180,7 +180,7 @@ $$
 
 ### 7.1`StressPK2(F)`
 
-令$C=F^TF$，$I_1=\mathrm{tr}(C)$，$I_3=\det(C)$，则
+令$$C=F^TF$$，$$I_1=\mathrm{tr}(C)$$，$$I_3=\det(C)$$，则
 
 $$
 S=G_0 I_3^{-1/3}\left(I-\frac13 I_1 C^{-1}\right)
@@ -201,20 +201,20 @@ $$
 
 ## 8.OrthotropicSolid（正交各向异性，仅3D）
 
-构造输入：3个正交主方向$a_i$、对应$E_i,G_i,\nu_i$（i=1..3）。
+构造输入：3个正交主方向$$a_i$$、对应$$E_i,G_i,\nu_i$$（i=1..3）。
 
 实现要点：
 
-- 继承`LinearElasticSolid`时，为了“时间步/声速估计”，父类用$\max(E_i)$和$\max(\nu_i)$近似。
-- 派生类内部会构造$A_i=a_i\otimes a_i$，以及各向异性系数`Mu_[i]`与`Lambda_(i,j)`。
+- 继承`LinearElasticSolid`时，为了“时间步/声速估计”，父类用$$\max(E_i)$$和$$\max(\nu_i)$$近似。
+- 派生类内部会构造$$A_i=a_i\otimes a_i$$，以及各向异性系数`Mu_[i]`与`Lambda_(i,j)`。
 
-`StressPK2(F)`使用有限变形应变$E=\frac12(F^TF-I)$，然后做双重求和组装：
+`StressPK2(F)`使用有限变形应变$$E=\frac12(F^TF-I)$$，然后做双重求和组装：
 
 $$
 S=\sum_{i=1}^{d}\mu_i\left(A_iE+EA_i+\frac12\sum_{j=1}^{d}\Lambda_{ij}\left(\langle A_i,E\rangle A_j+\langle A_j,E\rangle A_i\right)\right)
 $$
 
-其中$\langle A,E\rangle$对应代码里的`CalculateBiDotProduct(A_[i],strain)`。
+其中$$\langle A,E\rangle$$对应代码里的`CalculateBiDotProduct(A_[i],strain)`。
 
 VolumetricKirchhoff(J)沿用线弹性的
 
@@ -231,7 +231,7 @@ $$
 
 在Neo-Hookean基础上引入有限延展参数`j1_m_`（默认1.0）。
 
-令$C=F^TF$，$\text{strain}=\frac12(C-I)$，$J=\det(F)$，则
+令$$C=F^TF$$，$$\text{strain}=\frac12(C-I)$$，$$J=\det(F)$$，则
 
 $$
 S=\frac{G_0}{1-\frac{2\,\mathrm{tr}(\text{strain})}{j1_m}}I+\left(\lambda_0(J-1)-G_0\right)J\,C^{-1}
@@ -240,7 +240,7 @@ $$
 适用范围：
 
 - 适合链网络/橡胶类材料在大拉伸下“逐渐变硬”的效应。
-- 需要避免$1-2\,\mathrm{tr}(\text{strain})/j1_m\to0$导致奇异。
+- 需要避免$$1-2\,\mathrm{tr}(\text{strain})/j1_m\to0$$导致奇异。
 
 `getRelevantStressMeasureName()`返回`Cauchy`。
 
@@ -248,12 +248,12 @@ $$
 
 ### 10.1 参数与方向
 
-- 输入：$\rho_0$、`bulk_modulus`（体积模量意义）、参考纤维方向$f_0$、片层方向$s_0$、以及4组材料参数`a0_[k]`、`b0_[k]`。
-- 内部构造：$f_0\otimes f_0$、$s_0\otimes s_0$、$f_0\otimes s_0+s_0\otimes f_0$。
+- 输入：$$\rho_0$$、`bulk_modulus`（体积模量意义）、参考纤维方向$$f_0$$、片层方向$$s_0$$、以及4组材料参数`a0_[k]`、`b0_[k]`。
+- 内部构造：$$f_0\otimes f_0$$、$$s_0\otimes s_0$$、$$f_0\otimes s_0+s_0\otimes f_0$$。
 
 ### 10.2 由bulk_modulus与a0,b0反推(E,nu)
 
-代码里把背景剪切模量取为$G=a0$（仅background）：
+代码里把背景剪切模量取为$$G=a0$$（仅background）：
 
 $$
 \nu=\frac12\frac{3K-2G}{3K+G},\quad E=3K(1-2\nu)
@@ -261,7 +261,7 @@ $$
 
 ### 10.3 StressPK2(F)
 
-令$C=F^TF,J=\det(F)$，并定义不变量（实现完全一致）：
+令$$C=F^TF,J=\det(F)$$，并定义不变量（实现完全一致）：
 
 $$
 I_{ff}-1=f_0^TCf_0-1
@@ -311,7 +311,7 @@ $$
 
 - `registerLocalParameters()`注册粒子状态变量`Fiber`与`Sheet`。
 - `initializeLocalParameters()`派生出`FiberFiberTensor`、`SheetSheetTensor`、`FiberSheetTensor`。
-- `StressPK2(F,i)`把`Muscle`里的$f_0,s_0$替换为`local_f0_[i]`、`local_s0_[i]`及其张量积。
+- `StressPK2(F,i)`把`Muscle`里的$$f_0,s_0$$替换为`local_f0_[i]`、`local_s0_[i]`及其张量积。
 
 适用范围：
 
@@ -323,13 +323,13 @@ $$
 
 - `Integration1stHalfPK2`：直接用`StressPK2(F)`，再转PK1。
 - `Integration1stHalfKirchhoff`：用`VolumetricKirchhoff(J)`+`DeviatoricKirchhoff(deviatoric_b)`组装Kirchhoff应力。
-- `Integration1stHalfCauchy`：用`StressCauchy(almansi)`得到$\sigma$，再转PK1。
+- `Integration1stHalfCauchy`：用`StressCauchy(almansi)`得到$$\sigma$$，再转PK1。
 - `DecomposedIntegration1stHalf`：显式使用`VolumetricKirchhoff(J)`并做一项与`ShearModulus()`相关的修正，再加LeftCauchy数值耗散。
 
 因此选择建议：
 
 - 如果材料类没有实现`StressCauchy`(例如`NeoHookeanSolidIncompressible`目前TODO)，就不要走Cauchy路径。
-- 如果希望用Kirchhoff分解形式，需要`VolumetricKirchhoff(J)`合理且`DeviatoricKirchhoff`足够表达材料偏应力；当前`ElasticSolid`默认的`DeviatoricKirchhoff`是$G_0\,\text{deviatoric\_be}$，更接近各向同性剪切。
+- 如果希望用Kirchhoff分解形式，需要`VolumetricKirchhoff(J)`合理且`DeviatoricKirchhoff`足够表达材料偏应力；当前`ElasticSolid`默认的`DeviatoricKirchhoff`是$$G_0\,\text{deviatoric\_be}$$，更接近各向同性剪切。
 - 各向异性材料(`OrthotropicSolid`/`Muscle`/`LocallyOrthotropicMuscle`)主要通过`StressPK2`提供完整偏应力，通常更适合走PK2路径。
 
 ## 13.适用范围速查
