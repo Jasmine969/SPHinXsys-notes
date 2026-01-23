@@ -197,7 +197,7 @@ $$
 ### 7.3重要限制
 
 - `StressCauchy()`在cpp里标记TODO并返回空矩阵，因此不能用于Cauchy应力积分路径。
-- 头文件注释写明：Currentlyonlyworkswith`DecomposedIntegration1stHalf`,notwith`Integration1stHalf`。
+- 头文件注释写明：Currently only works with `DecomposedIntegration1stHalf`,not with `Integration1stHalf`。
 
 ## 8.OrthotropicSolid（正交各向异性，仅3D）
 

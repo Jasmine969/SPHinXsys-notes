@@ -39,6 +39,8 @@
   	  * [viscous dynamics](源码剖析/particle_dynamics/fluid_dynamics/viscous_dynamics.md)
   	* general_dynamics
   	  * [force_prior](源码剖析/particle_dynamics/general_dynamics/force_prior.md)
+  	* relax_dynamics
+  	  - [relax_dynamics](源码剖析/particle_dynamics/relax_dynamics/relax_stepping.md)
   * particle_generator
   	* [粒子生成](源码剖析/particle_generator/粒子生成.md)
   * physical_closure
