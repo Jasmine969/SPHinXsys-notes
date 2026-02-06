@@ -1,3 +1,7 @@
+**注：此工具已被SPHinXsys v1.2.2-sycl版本收录在`tools`目录。**
+
+---
+
 让GPT-5.2仿照eigen3的gdb.printers写了一个SPHinXsys的GDB扩展。
 
 目前只实现了一个功能——结构化输出`ParticleVariables`对象（如`water_block.getBaseParticles().all_discrete_variables_`）的值。`ParticleVariables`对象储存了所有注册的变量值，它们可以通过`getVariableDataByName`成员函数获取到，也可以通过`BodyStatesRecordingToVtp`的`addToWrite`成员函数输出到VTP文件。以往我们打印这个变量会得到如下结果：
