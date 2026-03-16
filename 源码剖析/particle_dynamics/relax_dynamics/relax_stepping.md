@@ -1,7 +1,7 @@
 
 # relax_stepping：类继承关系与适用范围速查
 
-对应实现文件：
+实现文件：
 
 - `src/shared/particle_dynamics/relax_dynamics/relax_stepping.h`
 - `src/shared/particle_dynamics/relax_dynamics/relax_stepping.hpp`
