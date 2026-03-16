@@ -7,7 +7,7 @@
 	* [02 二维槽道流案例注解](案例注解/02_SPHinXsys二维槽道流案例注解.md)
 	* [03 三维圆管泊肃叶流动案例注解](案例注解/03_SPHinXsys三维圆管泊肃叶流动案例注解.md)
 	* [04 二维脉动泊肃叶流动案例注解](案例注解/04_SPHinXsys二维脉动泊肃叶流动案例注解.md)
-	* [05 二维梁振动案例注解](案例注解/05_SPHinXsys二维梁振动案例注解.md)
+	* [05_二维梁振动案例注解](案例注解/05_SPHinXsys二维梁振动案例注解.md)
 * 用户指南
     * [快速编译新案例](用户指南/快速编译新案例.md)
     * [常见粒子属性的获取与输出](用户指南/常见粒子属性的获取与输出.md)
@@ -15,11 +15,9 @@
     * [指定物体运动或变形](用户指南/指定物体运动或变形.md)
     * [施加外力](用户指南/施加外力.md)
     * [如何在精确的时间步输出粒子信息到VTP文件](用户指南/如何在精确的时间步输出粒子信息到VTP文件.md)
-    * [自定义VTP输出目录名](用户指南/自定义VTP输出目录名.md)
-    * [SPHinXsys的GDB扩展](用户指南/SPHinXsys的GDB扩展.md)
-    * [通过ExecutionPolicy选择并行、串行与无序模式](用户指南/通过ExecutionPolicy选择并行、串行与无序模式.md)
 * [算法](算法/算法.md)
     * [边界截断问题的解决](算法/边界截断问题的解决.md)
+    * [全拉格朗日SPH入门](算法/全拉格朗日SPH入门.md)
 * 源码剖析
 
   * [adaptation](源码剖析/adaptation.md)
@@ -45,6 +43,8 @@
   	  * [force_prior](源码剖析/particle_dynamics/general_dynamics/force_prior.md)
   	* relax_dynamics
   	  - [relax_dynamics](源码剖析/particle_dynamics/relax_dynamics/relax_stepping.md)
+  	* solid_dynamics
+  	  - [elastic_dynamics](源码剖析/particle_dynamics/solid_dynamics/elastic_dynamics.md)
   * particle_generator
   	* [粒子生成](源码剖析/particle_generator/粒子生成.md)
   * physical_closure
@@ -53,5 +53,6 @@
   * [SPHinXsys 中用到的标签派发技术](源码剖析/SPHinXsys中用到的标签派发技术.md)
   * [从源码到范式：SPHinXsys的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys的RAII所有权设计与指针策略.md)
 * 其他
+	* [写了个SPHinXsys的GDB扩展](其他/写了个SPHinXsys的GDB扩展.md)
 	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)
 
