@@ -163,7 +163,6 @@ $$
 $$
 
 然后构造第一PK应力并乘以修正矩阵，结果储存在`stress_PK1_B_`中：
-	
 $$
 	\mathrm{stress\_PK1\_B}_i \leftarrow  \mathbf P_i^{n+1/2}\mathbf B_i^T,
 $$

@@ -45,6 +45,7 @@
   	  - [relax_dynamics](源码剖析/particle_dynamics/relax_dynamics/relax_stepping.md)
   	* solid_dynamics
   	  - [elastic_dynamics](源码剖析/particle_dynamics/solid_dynamics/elastic_dynamics.md)
+  	  - [constraint_dynamics](源码剖析/particle_dynamics/solid_dynamics/constraint_dynamics.md)
   * particle_generator
   	* [粒子生成](源码剖析/particle_generator/粒子生成.md)
   * physical_closure
