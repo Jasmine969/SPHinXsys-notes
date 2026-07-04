@@ -152,10 +152,33 @@ export spdlog_DIR=/opt/sphinxsys-soft/spdlog-1.16.0
 ```bash
 source /opt/sphinxsys-soft/sphinxsys.env.sh
 mkdir build && cd build
+# CentOS系统 =============
 # no SYCL
 cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized" -S ..
+# Ubuntu系统 =============
+# no SYCL
+cmake   -G "Unix Makefiles"                                                         \
+        -D CMAKE_BUILD_TYPE=Release                                                 \
+        -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++                           \
+        -D CMAKE_TOOLCHAIN_FILE="/data/sphinxsys-soft/vcpkg/scripts/buildsystems/vcpkg.cmake"      \
+        -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache   \
+        -D CMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized"							\
+        -S .                                                                        \
+        -B ./build-release-cpu
 # SYCL
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DSPHINXSYS_USE_SYCL=ON -DSPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda -DCMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized" -S ..
+cmake -G "Unix Makefiles" \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_C_COMPILER=icx \
+      -D CMAKE_CXX_COMPILER=icpx \
+      -D CMAKE_C_FLAGS="--gcc-install-dir=$GCC12_DIR" \
+      -D CMAKE_CXX_FLAGS="--gcc-install-dir=$GCC12_DIR -Wno-error=maybe-uninitialized" \
+      -D CMAKE_TOOLCHAIN_FILE="/data/software/sphinxsys-soft/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+      -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+      -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+      -D SPHINXSYS_USE_SYCL=ON \
+      -D SPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda \
+      -S . \
+      -B ./build-sycl-release
 make -j40 # 不建议占用全部核心
 ```
 
