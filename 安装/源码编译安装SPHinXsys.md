@@ -160,7 +160,7 @@ cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_C
 cmake   -G "Unix Makefiles"                                                         \
         -D CMAKE_BUILD_TYPE=Release                                                 \
         -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++                           \
-        -D CMAKE_TOOLCHAIN_FILE="/data/sphinxsys-soft/vcpkg/scripts/buildsystems/vcpkg.cmake"      \
+        -D CMAKE_TOOLCHAIN_FILE="/data/software/sphinxsys-soft/vcpkg/scripts/buildsystems/vcpkg.cmake"      \
         -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache   \
         -D CMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized"							\
         -S .                                                                        \
@@ -171,15 +171,17 @@ cmake -G "Unix Makefiles" \
       -D CMAKE_C_COMPILER=icx \
       -D CMAKE_CXX_COMPILER=icpx \
       -D CMAKE_C_FLAGS="--gcc-install-dir=$GCC12_DIR" \
-      -D CMAKE_CXX_FLAGS="--gcc-install-dir=$GCC12_DIR -Wno-error=maybe-uninitialized" \
+      -D CMAKE_CXX_FLAGS="--gcc-install-dir=$GCC12_DIR -Wno-error=maybe-uninitialized -Wno-tautological-constant-compare" \
       -D CMAKE_TOOLCHAIN_FILE="/data/software/sphinxsys-soft/vcpkg/scripts/buildsystems/vcpkg.cmake" \
       -D CMAKE_C_COMPILER_LAUNCHER=ccache \
       -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
       -D SPHINXSYS_USE_SYCL=ON \
       -D SPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda \
+      -D SPHINXSYS_BUILD_USER_EXAMPLES=ON \
+      -DCMAKE_PREFIX_PATH="/opt/yaml-cpp-0.9.0" \
       -S . \
       -B ./build-sycl-release
-make -j40 # 不建议占用全部核心
+make -j44 # 不建议占用全部核心
 ```
 
 ## 测试
