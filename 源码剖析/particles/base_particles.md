@@ -29,7 +29,7 @@
 
 | 变量名 | 含义 |
 | --- | --- |
-| `sv_total_real_particles_` | **真实粒子数**（real particles 的数量），类型为 `SingularVariable<UnsignedInt>*`，通过 `TotalRealParticles()` 访问其值。 |
+| `sv_total_real_particles_` | **真实粒子数**（real particles 的数量），类型为 `SingleVariable<UnsignedInt>*`，通过 `TotalRealParticles()` 访问其值。 |
 | `particles_bound_` | **当前粒子数组容量上限**（bound/capacity）。在实现中会随 buffer/ghost 分配而增长。通过 `ParticlesBound()` 访问。 |
 
 ## 2) 粒子 ID 映射（排序/重排相关）
@@ -55,8 +55,8 @@
 | 变量名 | 含义 |
 | --- | --- |
 | `sph_body_` | 所属 `SPHBody` 引用。构造时会 `sph_body.assignBaseParticles(this)`。 |
-| `body_name_` | body 名称缓存（来自 `sph_body_.getName()`）。 |
-| `base_material_` | 关联材料 `BaseMaterial` 引用。 |
+| `body_name_` | body 名称缓存（来自 `sph_body_.Name()`）。 |
+| 材料访问 | `BaseParticles`不再通过构造参数持有旧式`BaseMaterial`；需要材料时经所属`SPHBody`访问主体材料或附加属性。 |
 | `restart_xml_parser_` | restart（继续计算）用 XML 读写器。 |
 | `reload_xml_parser_` | reload（从外部粒子文件重载初值）用 XML 读写器。 |
 
@@ -67,7 +67,7 @@
 | `evolving_variables_` | 属于discrete variable。满足以下条件：1.需要在粒子排序时与粒子一起交换。2. 需要写入reload文件和restart文件。 | `"OriginalID"`, `"Position"`, `"VolumeMeasure"`。<br />对于fluid：`"Velocity"`, `"Mass"`, `"ForcePrior"`, `"Force"`, `"DensityChangeRate"`, `"Density"`, `"Pressure"`。 |
 | `variables_to_write_` | 属于discrete variable。需要写入输出的一组离散变量（变量对象集合）。 | `"OriginalId"`, `"SortedID"`。<br />对于fluid：`"Velocity"`。 |
 | `all_discrete_variables_` | 当前粒子上已注册的所有离散变量集合（内部用于查找/管理）。 | 所有`evolving_variables_`和`all_state_data_`都是。 |
-| `all_singular_variables_` | 当前粒子上已注册的所有单值变量集合（内部用于查找/管理）。 | `sv_total_real_particles_`, `"PhbysicalTime"`,`damping_rate_`。 |
+| `all_single_variables_` | 当前粒子上已注册的所有单值变量集合（内部用于查找/管理）。 | `sv_total_real_particles_`, `"PhbysicalTime"`,`damping_rate_`。 |
 | `all_state_data_` | 属于discrete variable。“状态变量数据指针”汇总（不包含粒子 ID 那类`UnsignedInt`状态）。用于统一拷贝粒子状态等操作。 | `"Position"`, `"VolumeMeasure"`, `"Density"`, `"Mass"`。<br />对于fluid：`"Velocity"`, `"DensityChangeRate"`, `"ForcePrior"`, `"Force"`。 |
 
 ## 6) BodyPart（按粒子子集划分）
@@ -83,8 +83,8 @@
 
 | 函数名 | 含义 |
 | --- | --- |
-| `BaseParticles(SPHBody&, BaseMaterial*)` | 构造：绑定body/material，注册 `TotalRealParticles` 单值变量。 |
-| `getSPHBody()` / `getBaseMaterial()` | 访问所属 body / material。 |
+| `BaseParticles(SPHBody&)` | 构造：绑定body并注册`TotalRealParticles`单值变量，不再接收`BaseMaterial*`。 |
+| `getSPHBody()` | 访问所属body；材料由body通过`getMatterMaterial()`或`getMaterialProperty<T>()`提供。 |
 | `getSPHAdaptation()` | 转发到 `sph_body_.getSPHAdaptation()`。 |
 | `printBodyName()` | 打印 body 名称。 |
 | `printAllDiscreteVariableNames(std::ostream&)` | 打印已注册离散变量名（按类型分组，便于确认模板参数）。 |
@@ -103,7 +103,7 @@
 
 | 函数名 | 含义 |
 | --- | --- |
-| `initializeBasicParticleVariables()` | 注册/初始化基础变量：`Position`、`VolumetricMeasure`、`Density`、`Mass`、`OriginalID`、`SortedID` 等。 |
+| `initializeBasicDiscreteVariables()` | 注册/初始化基础变量：`Position`、`VolumetricMeasure`、`Density`、`Mass`、`OriginalID`、`SortedID` 等。 |
 | `registerPositionAndVolumetricMeasure(StdVec<Vecd>&, StdVec<Real>&)` | 直接从外部数组挂接`Position/VolumetricMeasure`。 |
 | `registerPositionAndVolumetricMeasureFromReload()` | 从 reload XML 中读取并注册 `Position/VolumetricMeasure`。 |
 | `dvParticlePosition()` | 获取 `Position` 变量对象指针。 |

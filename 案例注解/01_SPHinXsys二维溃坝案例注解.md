@@ -94,7 +94,7 @@ class WallBoundary : public ComplexShape
 
 注意，这里原点O不在流体域，也不在固体域，而是在流体与固体中间的位置。这个原因到`generateParticles`时会讲。
 
-`add`和`subtract`这两行代码看着挺难理解的。我以`add`为例，讲讲它在底层在做什么。`WallBoundary`继承于`ComplexShape`，后者又继承于`BinaryShape`，`BinaryShape`具有`add`成员函数。`add`成员函数将在其`sub_shape_ptrs_keeper_`（储存`unique_ptr<Shape*>`的vector）添加一个指向`GeometricShapeBox`对象的`Shape`指针，然后在`sub_shapes_and_ops_`（储存`pair<Shape *, ShapeBooleanOps>`的vector）中添加一个`pair`：`(上面创建的Shape指针,add)`。创建指向`GeometricShapeBox`对象的`Shape`指针时，使用的参数为`Transform(outer_wall_translation)`和`outer_wall_halfsize`，其中前者调用了构造函数`explicit BaseTransform::BaseTransform(const VecType &translation)`表示平移变换，后者表示盒子一半尺寸，将传入`GeometricBox`的构造函数。
+`add`和`subtract`这两行代码看着挺难理解的。我以`add`为例，讲讲它在底层在做什么。`WallBoundary`继承于`ComplexShape`，后者又继承于`BinaryShape`，`BinaryShape`具有`add`成员函数。`add`成员函数将在其`sub_shape_ptrs_keeper_`（储存`unique_ptr<Shape*>`的vector）添加一个指向`GeometricShapeBox`对象的`Shape`指针，然后在`sub_shapes_and_ops_`（储存`pair<Shape *, GeometricOps>`的vector）中添加一个`pair`：`(上面创建的Shape指针,add)`。创建指向`GeometricShapeBox`对象的`Shape`指针时，使用的参数为`Transform(outer_wall_translation)`和`outer_wall_halfsize`，其中前者调用了构造函数`explicit BaseTransform::BaseTransform(const VecType &translation)`表示平移变换，后者表示盒子一半尺寸，将传入`GeometricBox`的构造函数。
 
 这里并没有用到`ComplexShape`的特性，令`WallBoundary`继承于`BinaryShape`足矣。
 
@@ -127,12 +127,12 @@ SPHBody(SPHSystem &sph_system, SharedPtr<Shape> shape_ptr);
 	GeometricShapeBox initial_water_block(Transform(water_block_translation), water_block_halfsize, "WaterBody");
 	FluidBody water_block(sph_system, initial_water_block);
 	// 定义材料，rho0f和c_f是初始化WeaklyCompressibleFluid的参数
-    water_block.defineMaterial<WeaklyCompressibleFluid>(rho0_f, c_f);
+    water_block.defineMatterMaterial<WeaklyCompressibleFluid>(rho0_f, c_f);
 	// 生成颗粒，模板参数中第一个是颗粒类型，第二个是创建风格
     water_block.generateParticles<BaseParticles, Lattice>();
 
     SolidBody wall_boundary(sph_system, makeShared<WallBoundary>("WallBoundary"));
-    wall_boundary.defineMaterial<Solid>();
+    wall_boundary.defineMatterMaterial<Solid>();
     wall_boundary.generateParticles<BaseParticles, Lattice>();
 ```
 

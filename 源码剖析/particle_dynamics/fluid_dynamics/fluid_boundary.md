@@ -7,7 +7,7 @@
 
 据此将流体边界分为两大类：
 
-1. 第一类是buffer，buffer是一个入口或出口的缓冲区（通常是`AlignedBox`）。通过body part机制只遍历该区域对应的粒子；对速度边界，通常是在该区域内对粒子速度做“松弛/投影”；对开边界（inflow/outflow），通常还要配合粒子注入/删除，并配套预留buffer particle内存。单向buffer包括用于流入的`EmitterInflowInjection`、用于流出的`DisposerOutflowDeletion`和既可流入又可流出的`BidirectionalBuffer`。
+1. 第一类是buffer，buffer是一个入口或出口的缓冲区（通常是`OrientedBox`）。通过body part机制只遍历该区域对应的粒子；对速度边界，通常是在该区域内对粒子速度做“松弛/投影”；对开边界（inflow/outflow），通常还要配合粒子注入/删除，并配套预留buffer particle内存。单向buffer包括用于流入的`EmitterInflowInjection`、用于流出的`DisposerOutflowDeletion`和既可流入又可流出的`BidirectionalBuffer`。
 2. 第二类用于设定粒子的属性。包括设定速度的`InflowVelocityCondition`、`TargetVelocity`和设定压力的`PressureBoundaryCondition`、`TargetPressure`。
 
 本文聚焦几个最常用的边界机制，源码主要位于`src\shared\particle_dynamics\fluid_dynamics\boundary_condition\fluid_boundary.h/.cpp`和`src\shared\particles\particle_reserve.h/.cpp`。这里我们关心如何在底层上实现，而不是如何使用。关于使用，请移步[案例注解](https://jasmine969.gitbook.io/jasmine969-docs/summary/an-li-zhu-jie)。
@@ -18,7 +18,7 @@
 
 类模板`fluid_dynamics::InflowVelocityCondition<TargetVelocity>`定义于`fluid_boundary.h`。它的特点是：
 
-- body part类型是`AlignedBoxByCell`，即按空间区域施加；
+- body part类型是`OrientedBoxByCell`，即按空间区域施加；
 - 对box内粒子直接修改速度；
 - 支持松弛率`relaxation_rate`（默认1.0表示完全强制到目标速度）。
 
@@ -55,12 +55,12 @@ Vecd operator()(Vecd &position, Vecd &velocity, Real current_time);
 构造函数签名：
 
 ```cpp
-EmitterInflowInjection(AlignedBoxByParticle &aligned_box_part, ParticleBuffer<Base> &buffer);
+EmitterInflowInjection(OrientedBoxByParticle &aligned_box_part, ParticleBuffer<Base> &buffer);
 ```
 
 要点：
 
-- emitter必须是`AlignedBoxByParticle`：保证遍历集合稳定，不会因为粒子跑出box就失去遍历机会。
+- emitter必须是`OrientedBoxByParticle`：保证遍历集合稳定，不会因为粒子跑出box就失去遍历机会。
 - 必须传入`ParticleBuffer`并且已reserve，否则`checkParticlesReserved()`会直接报错退出。
 
 ## original id与sorted id
@@ -73,7 +73,7 @@ size_t sorted_index_i = sorted_id_[original_index_i];
 
 原因是：
 
-- `AlignedBoxByParticle`在tag时记录的是“当时的粒子索引”，这更接近original id语义；
+- `OrientedBoxByParticle`在tag时记录的是“当时的粒子索引”，这更接近original id语义；
 - 但粒子属性数组在很多配置里会按sorted顺序存取（粒子排序后），因此需要用`SortedID`把original id映射到当前的sorted index。
 
 ## update逻辑
@@ -95,7 +95,7 @@ size_t sorted_index_i = sorted_id_[original_index_i];
 
 互斥锁的意义是：注入通常可能在并行遍历中执行，创建/切换粒子状态涉及修改`TotalRealParticles()`等全局计数，必须保证线程安全。
 
-补充：同文件里还有`EmitterInflowCondition`，它用于“随emitter运动的入口条件”（会基于old/new transform更新粒子位置/速度，并把密度压力重置到入口参考态）。它同样依赖`AlignedBoxByParticle`，但侧重点是“入口本身在动”。
+补充：同文件里还有`EmitterInflowCondition`，它用于“随emitter运动的入口条件”（会基于old/new transform更新粒子位置/速度，并把密度压力重置到入口参考态）。它同样依赖`OrientedBoxByParticle`，但侧重点是“入口本身在动”。
 
 # 流出边界：DisposerOutflowDeletion
 
@@ -106,10 +106,10 @@ size_t sorted_index_i = sorted_id_[original_index_i];
 构造函数签名：
 
 ```cpp
-DisposerOutflowDeletion(AlignedBoxByCell &aligned_box_part);
+DisposerOutflowDeletion(OrientedBoxByCell &aligned_box_part);
 ```
 
-它使用`AlignedBoxByCell`，即遍历的是disposer区域当前cell中的粒子（sorted index语义），所以update里直接用`index_i`访问`pos_`，不需要做sorted id映射。
+它使用`OrientedBoxByCell`，即遍历的是disposer区域当前cell中的粒子（sorted index语义），所以update里直接用`index_i`访问`pos_`，不需要做sorted id映射。
 
 ## 为什么是while而不是if
 
@@ -160,7 +160,7 @@ class BidirectionalBuffer
     class Deletion : public BaseLocalDynamics<BodyPartByCell> ...
 
   public:
-    BidirectionalBuffer(AlignedBoxByCell &aligned_box_part, ParticleBuffer<Base> &particle_buffer)
+    BidirectionalBuffer(OrientedBoxByCell &aligned_box_part, ParticleBuffer<Base> &particle_buffer)
         : target_pressure_(*this),
           tag_buffer_particles(aligned_box_part),
           injection(aligned_box_part, particle_buffer, target_pressure_),
@@ -181,11 +181,11 @@ class BidirectionalBuffer
     class TagBufferParticles : public BaseLocalDynamics<BodyPartByCell>
     {
       public:
-        TagBufferParticles(AlignedBoxByCell &aligned_box_part)
+        TagBufferParticles(OrientedBoxByCell &aligned_box_part)
             : BaseLocalDynamics<BodyPartByCell>(aligned_box_part),
               part_id_(aligned_box_part.getPartID()),
               pos_(particles_->getVariableDataByName<Vecd>("Position")),
-              aligned_box_(aligned_box_part.getAlignedBox()),
+              aligned_box_(aligned_box_part.getOrientedBox()),
               buffer_indicator_(particles_->registerStateVariableData<int>("BufferIndicator"))
         {
             particles_->addEvolvingVariable<int>("BufferIndicator");
@@ -203,7 +203,7 @@ class BidirectionalBuffer
       protected:
         int part_id_;
         Vecd *pos_;
-        AlignedBox &aligned_box_;
+        OrientedBox &aligned_box_;
         int *buffer_indicator_;
     };
 ```
@@ -216,13 +216,13 @@ class BidirectionalBuffer
     class Injection : public BaseLocalDynamics<BodyPartByCell>
     {
       public:
-        Injection(AlignedBoxByCell &aligned_box_part, ParticleBuffer<Base> &particle_buffer,
+        Injection(OrientedBoxByCell &aligned_box_part, ParticleBuffer<Base> &particle_buffer,
                   TargetPressure &target_pressure)
             : BaseLocalDynamics<BodyPartByCell>(aligned_box_part),
               part_id_(aligned_box_part.getPartID()),
               particle_buffer_(particle_buffer),
-              aligned_box_(aligned_box_part.getAlignedBox()),
-              fluid_(DynamicCast<Fluid>(this, particles_->getBaseMaterial())),
+              aligned_box_(aligned_box_part.getOrientedBox()),
+              fluid_(DynamicCast<Fluid>(this, particles_->getMatterMaterial())),
               pos_(particles_->getVariableDataByName<Vecd>("Position")),
               rho_(particles_->getVariableDataByName<Real>("Density")),
               p_(particles_->getVariableDataByName<Real>("Pressure")),
@@ -264,7 +264,7 @@ class BidirectionalBuffer
         int part_id_;
         std::mutex mutex_switch;
         ParticleBuffer<Base> &particle_buffer_;
-        AlignedBox &aligned_box_;
+        OrientedBox &aligned_box_;
         Fluid &fluid_;
         Vecd *pos_;
         Real *rho_, *p_;
@@ -291,10 +291,10 @@ class BidirectionalBuffer
     class Deletion : public BaseLocalDynamics<BodyPartByCell>
     {
       public:
-        Deletion(AlignedBoxByCell &aligned_box_part)
+        Deletion(OrientedBoxByCell &aligned_box_part)
             : BaseLocalDynamics<BodyPartByCell>(aligned_box_part),
               part_id_(aligned_box_part.getPartID()),
-              aligned_box_(aligned_box_part.getAlignedBox()),
+              aligned_box_(aligned_box_part.getOrientedBox()),
               pos_(particles_->getVariableDataByName<Vecd>("Position")),
               buffer_indicator_(particles_->getVariableDataByName<int>("BufferIndicator")) {};
         virtual ~Deletion() {};
@@ -317,7 +317,7 @@ class BidirectionalBuffer
       protected:
         int part_id_;
         std::mutex mutex_switch;
-        AlignedBox &aligned_box_;
+        OrientedBox &aligned_box_;
         Vecd *pos_;
         int *buffer_indicator_;
     };
@@ -401,9 +401,9 @@ class PressureBoundaryCondition : public BaseFlowBoundaryCondition
 {
   public:
     /** default parameter indicates prescribe pressure */
-    explicit PressureBoundaryCondition(AlignedBoxByCell &aligned_box_part)
+    explicit PressureBoundaryCondition(OrientedBoxByCell &aligned_box_part)
         : BaseFlowBoundaryCondition(aligned_box_part),
-          aligned_box_(aligned_box_part.getAlignedBox()),
+          aligned_box_(aligned_box_part.getOrientedBox()),
           alignment_axis_(aligned_box_.AlignmentAxis()),
           transform_(aligned_box_.getTransform()),
           target_pressure_(*this),
@@ -411,7 +411,7 @@ class PressureBoundaryCondition : public BaseFlowBoundaryCondition
           kernel_correction_(this->particles_),
           physical_time_(sph_system_.getSystemVariableDataByName<Real>("PhysicalTime")) {};
     virtual ~PressureBoundaryCondition() {};
-    AlignedBox &getAlignedBox() { return aligned_box_; };
+    OrientedBox &getOrientedBox() { return aligned_box_; };
 
     void update(size_t index_i, Real dt = 0.0)
     {
@@ -426,7 +426,7 @@ class PressureBoundaryCondition : public BaseFlowBoundaryCondition
     };
 
   protected:
-    AlignedBox &aligned_box_;
+    OrientedBox &aligned_box_;
     const int alignment_axis_;
     Transform &transform_;
     TargetPressure target_pressure_;
@@ -436,7 +436,7 @@ class PressureBoundaryCondition : public BaseFlowBoundaryCondition
 };
 ```
 
-构造函数接收一个`AlignedBoxByCell`对象，从中获取aligned box、轴线方向和变换，初始化了`kernel_sum_`。这里`kernel_sum_`就是$$\sum_j (m_j/\rho_j)\nabla W_{ij}$$。`update`函数中，如果粒子位于aligned box之内，那么依次执行
+构造函数接收一个`OrientedBoxByCell`对象，从中获取aligned box、轴线方向和变换，初始化了`kernel_sum_`。这里`kernel_sum_`就是$$\sum_j (m_j/\rho_j)\nabla W_{ij}$$。`update`函数中，如果粒子位于aligned box之内，那么依次执行
 
 1. 速度递增$$2 p_\mathrm{b} \sum_j m_j/(\rho_i \rho_j) \nabla W_{i j}$$，如需要修正核函数梯度，施加之；
 2. 只保留速度的法向分量。这里有三行代码，看着多，实际上是为了处理有旋转变换的情况（aligned box与坐标轴不对齐）。

@@ -2,7 +2,7 @@
 
 - 自己写一个`ParticleGenerator`
 - 流入速度设定
-- `defineMaterial`和`defineClosure`的区别
+- 主体材料与附加材料属性的区别
 - 周期性边界
 - 简单的流壳耦合（壁面只有单层粒子，但是壁面固定）
 - `SimpleDynamics`对象是如何构造和执行的（深入探究源码）
@@ -52,7 +52,7 @@ class WaterBlock : public MultiPolygonShape
     class FluidAxialObserver; // 好像是多余的
     explicit WaterBlock(const std::vector<Vecd> &shape, const std::string &shape_name) : MultiPolygonShape(shape_name)
     {
-        multi_polygon_.addAPolygon(shape, ShapeBooleanOps::add);
+        multi_polygon_.addAPolygon(shape, GeometricOps::add);
     }
 };
 ...
@@ -136,7 +136,7 @@ class ParticleGenerator<SurfaceParticles, WallBoundary> : public ParticleGenerat
 
 # 流入速度
 
-流入速度显然是针对入口而言的，我们只需对入口处的粒子设置速度即可，这个入口正是几何中x负半轴的部分，称之为流入缓冲区（inflow buffer）。但是`water_block`是一个整体，如何告诉程序取其中的一部分呢？这就涉及body part的概念。body part是body的一部分。它可以让我们只模拟给定body的指定区域的粒子。这在程序中体现为`AlignedBoxByCell`。以下为流入速度设定的全部代码：
+流入速度显然是针对入口而言的，我们只需对入口处的粒子设置速度即可，这个入口正是几何中x负半轴的部分，称之为流入缓冲区（inflow buffer）。但是`water_block`是一个整体，如何告诉程序取其中的一部分呢？这就涉及body part的概念。body part是body的一部分。它可以让我们只模拟给定body的指定区域的粒子。这在程序中体现为`OrientedBoxByCell`。以下为流入速度设定的全部代码：
 
 ```cpp
 //----------------------------------------------------------------------
@@ -145,20 +145,20 @@ class ParticleGenerator<SurfaceParticles, WallBoundary> : public ParticleGenerat
 struct InflowVelocity
 {
     Real u_ref_, t_ref_;
-    AlignedBox &aligned_box_;
+    OrientedBox &oriented_box_;
     Vecd halfsize_;
 
     template <class BoundaryConditionType>
     InflowVelocity(BoundaryConditionType &boundary_condition)
         : u_ref_(U_f), t_ref_(2.0),
-          aligned_box_(boundary_condition.getAlignedBox()),
-          halfsize_(aligned_box_.HalfSize()) {}
+          oriented_box_(boundary_condition.getOrientedBox()),
+          halfsize_(oriented_box_.HalfSize()) {}
 
     Vecd operator()(Vecd &position, Vecd &velocity, Real current_time)
     {
         Vecd target_velocity = velocity;
         Real u_ave = current_time < t_ref_ ? 0.5 * u_ref_ * (1.0 - cos(Pi * current_time / t_ref_)) : u_ref_;
-        if (aligned_box_.checkInBounds(position))
+        if (oriented_box_.checkInBounds(position))
         {
             target_velocity[0] = 1.5 * u_ave * (1.0 - position[1] * position[1] / halfsize_[1] / halfsize_[1]);
         }
@@ -169,8 +169,8 @@ struct InflowVelocity
 void channel_flow_shell(...) {
     ...
     /** Inflow boundary condition. */
-    AlignedBoxByCell inflow_buffer(
-        water_block, AlignedBox(xAxis, Transform(Vec2d(buffer_translation)), buffer_halfsize));
+    OrientedBoxByCell inflow_buffer(
+        water_block, OrientedBox(xAxis, Transform(Vec2d(buffer_translation)), buffer_halfsize));
     SimpleDynamics<fluid_dynamics::InflowVelocityCondition<InflowVelocity>> parabolic_inflow(inflow_buffer);
     ...
     while (...) {
@@ -185,7 +185,7 @@ void channel_flow_shell(...) {
 }
 ```
 
-程序设计了一个类`InflowVelocity`。它的构造函数需要一个`BoundaryConditionType`对象`boundary_condition`作为参数，从`boundary_condition`中，先获取`aligned_box_`，再获取后者的`halfsize`。在main函数调用中可以看出，此aligned box就是`AlignedBox(xAxis, Transform(Vec2d(buffer_translation)), buffer_halfsize)`，它就是inflow buffer。`xAxis`是定义在`base_data_type.h`中的常量，类似还有`yAxis`和`zAxis`。`AlignedBox`类与`GeometricBox`类很像，只不过`AlignedBox`多了一个对齐轴（alignment axis），所有“上/下边界、周期映射、近边界判断”等操作都沿着这个对齐轴来做。
+程序设计了一个类`InflowVelocity`。它的构造函数需要一个`BoundaryConditionType`对象`boundary_condition`作为参数，从`boundary_condition`中先获取`oriented_box_`，再获取后者的`halfsize`。在main函数调用中可以看出，此 oriented box 就是`OrientedBox(xAxis, Transform(Vec2d(buffer_translation)), buffer_halfsize)`，它就是 inflow buffer。`xAxis`是定义在`base_data_type.h`中的常量，类似还有`yAxis`和`zAxis`。`OrientedBox`类与`GeometricBox`类很像，只不过`OrientedBox`多了一个对齐轴（alignment axis），所有“上/下边界、周期映射、近边界判断”等操作都沿着这个对齐轴来做。
 
 `InflowVelocity`的函数调用运算符被重载了，因此它实际上会生成一个函数对象。它有三个形参：位置、速度、当前时间。`u_ave`是随时间变化的平均速度，形式如下：
 $$
@@ -204,7 +204,7 @@ u_x=1.5\bar{u}\left[1-\frac{y^2}{\mathrm{(DH/2)}^2}\right].
 $$
 这是典型的抛物线分布，说明将入口流动设定为充分发展的流动。
 
-定义完`InflowVelocity`类后，用`water_block`和aligned box定义了一个`AlignedBoxByCell`对象`inflow_buffer`。它用来初始化`SimpleDynamics<fluid_dynamics::InflowVelocityCondition<InflowVelocity>>`对象。使用`AlignedBoxByCell`的目的是允许程序在遍历时只遍历inflow buffer的粒子，而非体系所有粒子，以提高计算效率。使用`SimpleDynamics`是因为流入速度不涉及颗粒交互。只需要update即可。
+定义完`InflowVelocity`类后，用`water_block`和aligned box定义了一个`OrientedBoxByCell`对象`inflow_buffer`。它用来初始化`SimpleDynamics<fluid_dynamics::InflowVelocityCondition<InflowVelocity>>`对象。使用`OrientedBoxByCell`的目的是允许程序在遍历时只遍历inflow buffer的粒子，而非体系所有粒子，以提高计算效率。使用`SimpleDynamics`是因为流入速度不涉及颗粒交互。只需要update即可。
 
 ## `SimpleDynamics`是如何构造的
 
@@ -234,7 +234,7 @@ class SimpleDynamics : public LocalDynamicsType, public BaseDynamics<void>
 
 `LocalDynamicsType`是用户显式指定的`InflowVelocityCondition<InflowVelocity>`，`ExecutionPolicy`保持默认值。`SimpleDynamics`继承于`LocalDynamicsType`（`InflowVelocityCondition`）和`BaseDynamics<void>`。于是此类分别获得了`InflowVelocityCondition<InflowVelocity>`的`update`、`setupDynamics`成员函数和`BaseDynamics<void>`的`exec`、`setUpdated`成员函数。
 
-`inflow_buffer`作为参数传入`SimpleDynamics`的构造函数，因此`DynamicsIdentifier`被推断为`AlignedBoxByCell`，`args`为空参数包。
+`inflow_buffer`作为参数传入`SimpleDynamics`的构造函数，因此`DynamicsIdentifier`被推断为`OrientedBoxByCell`，`args`为空参数包。
 
 然后进入成员初始化列表。首先会调用基类构造函数。因为多重继承于两个基类，调用基类构造函数应按照派生列表中基类的出现顺序。因此，先调用`InflowVelocityCondition<InflowVelocity>`的构造函数。
 
@@ -248,16 +248,16 @@ class InflowVelocityCondition : public BaseFlowBoundaryCondition
 {
   public:
     /** default parameter indicates prescribe velocity */
-    explicit InflowVelocityCondition(AlignedBoxByCell &aligned_box_part, Real relaxation_rate = 1.0)
+    explicit InflowVelocityCondition(OrientedBoxByCell &aligned_box_part, Real relaxation_rate = 1.0)
         : BaseFlowBoundaryCondition(aligned_box_part),
-          relaxation_rate_(relaxation_rate), aligned_box_(aligned_box_part.getAlignedBox()),
+          relaxation_rate_(relaxation_rate), aligned_box_(aligned_box_part.getOrientedBox()),
           transform_(aligned_box_.getTransform()), halfsize_(aligned_box_.HalfSize()),
           target_velocity(*this),
           physical_time_(sph_system_.getSystemVariableDataByName<Real>("PhysicalTime")) {};
     ...
   protected:
     Real relaxation_rate_;
-    AlignedBox &aligned_box_;
+    OrientedBox &aligned_box_;
     Transform &transform_;
     Vecd halfsize_;
     TargetVelocity target_velocity;
@@ -288,7 +288,7 @@ class BaseLocalDynamics
 }
 ```
 
-`DynamicsIdentifier`被推断为`BodyPartByCell`类型，而也就是说`identifier_`是一个绑定到`BodyPartByCell`类型的`AlignedBoxByCell`对象。`sph_body_`被初始化为`inflow_buffer`的`sph_body_`。从`inflow_buffer`定义中可以获知它就是`water_block`。
+`DynamicsIdentifier`被推断为`BodyPartByCell`类型，而也就是说`identifier_`是一个绑定到`BodyPartByCell`类型的`OrientedBoxByCell`对象。`sph_body_`被初始化为`inflow_buffer`的`sph_body_`。从`inflow_buffer`定义中可以获知它就是`water_block`。
 
 ### 4. `BaseFlowBoundaryCondition`构造完毕
 
@@ -380,7 +380,7 @@ virtual void setupDynamics(Real dt = 0.0) {};
                      { this->update(i, dt); });
 ```
 
-参数`local_dynamics_function`是一个lambda函数对象`[&](size_t i) { this->update(i, dt); })`。`[&]`以引用捕获方式捕获了`exec`函数体中所有变量，包括`dt`和`this`指针。它接受粒子索引`i`作为参数，在函数体中调用`InflowVelocityCondition<InflowVelocity>`的`update`成员函数。不用看`particle_for`源码我们就能猜出来，遍历`inflow_buffer`的每个粒子，对其调用`this->update`函数，采取并行模式。从这里可以看出来，使用`AlignedBoxByCell`对象的好处在于不用遍历`water_block`每个粒子。
+参数`local_dynamics_function`是一个lambda函数对象`[&](size_t i) { this->update(i, dt); })`。`[&]`以引用捕获方式捕获了`exec`函数体中所有变量，包括`dt`和`this`指针。它接受粒子索引`i`作为参数，在函数体中调用`InflowVelocityCondition<InflowVelocity>`的`update`成员函数。不用看`particle_for`源码我们就能猜出来，遍历`inflow_buffer`的每个粒子，对其调用`this->update`函数，采取并行模式。从这里可以看出来，使用`OrientedBoxByCell`对象的好处在于不用遍历`water_block`每个粒子。
 
 # 体系定义
 
@@ -409,17 +409,18 @@ void channel_flow_shell(...)
 	//	Creating body, materials and particles.
     //----------------------------------------------------------------------
     FluidBody water_block(sph_system, makeShared<WaterBlock>(createWaterBlockShape(), "WaterBody"));
-    water_block.defineClosure<WeaklyCompressibleFluid, Viscosity>(ConstructArgs(rho0_f, c_f), mu_f);
+    water_block.defineMatterMaterial<WeaklyCompressibleFluid>(rho0_f, c_f);
+    water_block.addMaterialProperty<Viscosity>(mu_f);
     water_block.generateParticles<BaseParticles, Lattice>();
 
     SolidBody wall_boundary(sph_system, makeShared<DefaultShape>("Wall"));
-    wall_boundary.defineMaterial<Solid>();
+    wall_boundary.defineMatterMaterial<Solid>();
     wall_boundary.generateParticles<SurfaceParticles, WallBoundary>(resolution_ref, wall_thickness);
     ...
 }
 ```
 
-在二维溃坝案例中，我们使用`water_block.defineMaterial<WeaklyCompressibleFluid>(rho0_f, c_f);`来定义材料属性。这里却没有用`defineMaterial`，而是用了`defineClosure`。这是因为除了`WeaklyCompressibleFluid`还有`Viscosity`。`defineMaterial`和`defineClosure`的核心区别是：一个只创建“单一材料模型(`BaseMaterial`派生类)”，另一个创建“物理闭包（`Closure`）”，把多个材料/本构/附加模型组合成一个整体材料对象。在 SPHinXsys 里二者最终都会把`SPHBody::base_material_`指向你创建的对象，但对象类型和用途不同。`WeaklyCompressibleFluid`需要两个参数：密度和声速，`Viscosity`需要一个参数：`mu_f`。为了让编译器知道哪些参数是传给`WeaklyCompressibleFluid`的，我们需要用`ConstructArgs`吧`rho_f`和`c_f`打包。
+`WeaklyCompressibleFluid`是主体物质材料，构造参数为参考密度`rho0_f`和声速`c_f`；`Viscosity`是附加材料属性，构造参数为动力黏度`mu_f`。当前版本由`SPHBody`分别管理一个`MatterMaterial`和多个`MaterialProperty`，因此二者需要分别通过`defineMatterMaterial`和`addMaterialProperty`注册。旧版`v1.2.2-sycl`曾使用`defineClosure<WeaklyCompressibleFluid, Viscosity>`把二者组合成单个材料对象，当前版本不再采用这种写法。
 
 `Solid`这种材料在创建时也是需要参数的，只不过这里使用了默认参数：密度1.0，接触刚度1.0，接触摩擦系数1.0。不过这个案例中也没有用到这些参数——你可以把密度改为任意非零值，接触刚度和接触摩擦系数改为任意值，然后会发现结果没变。当壁面运动时，这些参数才会起作用。
 

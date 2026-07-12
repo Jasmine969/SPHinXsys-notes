@@ -62,15 +62,15 @@ struct RightInflowPressure
 ## 定义
 
 ```cpp
-    AlignedBox left_emitter_shape(xAxis, Transform(Vec2d(left_bidirectional_translation)), bidirectional_buffer_halfsize);
-    AlignedBoxByCell left_emitter(water_block, left_emitter_shape);
+    OrientedBox left_emitter_shape(xAxis, Transform(Vec2d(left_bidirectional_translation)), bidirectional_buffer_halfsize);
+    OrientedBoxByCell left_emitter(water_block, left_emitter_shape);
     fluid_dynamics::BidirectionalBuffer<LeftInflowPressure> left_bidirection_buffer(left_emitter, in_outlet_particle_buffer);
 ```
 
 当我们定义一个`BidirectionalBuffer`时，需要提供三个东西：
 
 1. `TargetPressure`类，用于在注入时将periodic bounding回lower bound的粒子压力设为指定压力。这里`TargetPressure`是`LeftInflowPressure`。
-2. `AlignedBoxByCell`对象，用于确定buffer区域。
+2. `OrientedBoxByCell`对象，用于确定buffer区域。
 3. `ParticleBuffer<Base>`（或其派生类）对象，用于在流体注入时`checkEnoughBuffer`。
 
 注意，这个类还会用到`previous_surface_indicator_`，因此它必须在定义`FreeSurfaceIndication<Inner<SpatialTemporal>>`或`*SpatialTemporalFreeSurfaceIndicationComplex`之后方能定义。
@@ -78,8 +78,8 @@ struct RightInflowPressure
 对于出口附近的双向buffer，需要特别注意：**要将aligned box翻转180度（Pi）**。这是因为出口处的正向速度代表流出（删除），反向速度代表流入（注入），与入口处的刚好相反。
 
 ```cpp
-    AlignedBox right_emitter_shape(xAxis, Transform(Rotation2d(Pi), Vec2d(right_bidirectional_translation)), bidirectional_buffer_halfsize);
-    AlignedBoxByCell right_emitter(water_block, right_emitter_shape);
+    OrientedBox right_emitter_shape(xAxis, Transform(Rotation2d(Pi), Vec2d(right_bidirectional_translation)), bidirectional_buffer_halfsize);
+    OrientedBoxByCell right_emitter(water_block, right_emitter_shape);
     fluid_dynamics::BidirectionalBuffer<RightInflowPressure> right_bidirection_buffer(right_emitter, in_outlet_particle_buffer);
 ```
 

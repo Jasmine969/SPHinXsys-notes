@@ -5,7 +5,7 @@
 - 自定义光滑长度
 - 流入流出边界
 - particle_bound_与buffer particle的概念
-- `AlignedBoxByParticle`和`AlignedBoxByCell`的区别
+- `OrientedBoxByParticle`和`OrientedBoxByCell`的区别
 - 自由表面识别
 - 各种density summation的适用场景
 - 更好地施加入口速度条件
@@ -88,7 +88,7 @@ void poiseuille_flow(const Real resolution_ref, const Real resolution_shell, con
     ...
     SolidBody shell_boundary(system, makeShared<DefaultShape>("Shell"));
     shell_boundary.defineAdaptation<SPH::SPHAdaptation>(1.15, resolution_ref / resolution_shell);
-	shell_boundary.defineMaterial<LinearElasticSolid>(1, 1e3, 0.45);
+	shell_boundary.defineMatterMaterial<LinearElasticSolid>(1, 1e3, 0.45);
     shell_boundary.generateParticles<SurfaceParticles, ShellBoundary>(resolution_shell, wall_thickness, shell_thickness);
     ...
 }
@@ -108,7 +108,7 @@ TEST(poiseuille_flow, 10_particles)
 - 第一个参数是光滑长度与粒子间距之比（$$h/\Delta L$$），默认值是1.3，设为1.15则有$$h=1.15\Delta L$$；
 - 第二个参数是全局分辨率与本body分辨率之比，默认指是1。这里是按照定义给的：`resolution_ref`是全局分辨率，`resolution_shell`是shell的分辨率。
 
-`defineMaterial`将材料设置为线弹性材料，似是没有必要（见下图），因为这个案例中壁面是固定不动的。我认为改成`Solid`也可以。
+`defineMatterMaterial`将材料设置为线弹性材料，似是没有必要（见下图），因为这个案例中壁面是固定不动的。我认为改成`Solid`也可以。
 
 在下图中，我模拟了几个case。纵坐标是轴向观测点`Velocity[15][1]`的数据，横坐标是物理时间。original-0、original-1、original-2表示用原始程序跑三次出的结果（每次跑结果都不一样，跑三次可以看出大致趋势）；Solid是将线弹性材料改为`Solid`并不传递任何参数的结果。Solid-NoAdapt在Solid基础上进一步取消了Adaptation。Solid-NoAdapt_Single_resoltion在Solid-NoAdapt的基础上将流体粒子的间距减小为shell粒子的间距，这样就是单一分辨率了。
 
@@ -135,7 +135,8 @@ TEST(poiseuille_flow, 10_particles)
     //	Creating bodies with corresponding materials and particles.
     //----------------------------------------------------------------------
     FluidBody water_block(system, water_block_shape);
-    water_block.defineClosure<WeaklyCompressibleFluid, Viscosity>(ConstructArgs(rho0_f, c_f), mu_f);
+    water_block.defineMatterMaterial<WeaklyCompressibleFluid>(rho0_f, c_f);
+    water_block.addMaterialProperty<Viscosity>(mu_f);
     ParticleBuffer<ReserveSizeFactor> inlet_particle_buffer(0.5);
     water_block.generateParticlesWithReserve<BaseParticles, Lattice>(inlet_particle_buffer);
 ```
@@ -163,13 +164,13 @@ $$
 struct InflowVelocity
 {
     Real u_ref_, t_ref_;
-    AlignedBox &aligned_box_;
+    OrientedBox &aligned_box_;
     Vec3d halfsize_;
 
     template <class BoundaryConditionType>
     InflowVelocity(BoundaryConditionType &boundary_condition)
         : u_ref_(U_f), t_ref_(1.0),
-          aligned_box_(boundary_condition.getAlignedBox()),
+          aligned_box_(boundary_condition.getOrientedBox()),
           halfsize_(aligned_box_.HalfSize()) {}
 
     Vec3d operator()(Vec3d &position, Vec3d &velocity, Real current_time)
@@ -190,34 +191,34 @@ void poiseuille_flow(const Real resolution_ref, const Real resolution_shell, con
     const Vec3d emitter_buffer_halfsize(fluid_radius, inflow_length * 0.5, fluid_radius);
     const Vec3d emitter_buffer_translation(0., inflow_length * 0.5 - 2 * resolution_ref, 0.);
 	...
-    AlignedBoxByCell emitter_buffer(water_block, AlignedBox(yAxis, Transform(Vec3d(emitter_buffer_translation)), emitter_buffer_halfsize));
+    OrientedBoxByCell emitter_buffer(water_block, OrientedBox(yAxis, Transform(Vec3d(emitter_buffer_translation)), emitter_buffer_halfsize));
     SimpleDynamics<fluid_dynamics::InflowVelocityCondition<InflowVelocity>> emitter_buffer_inflow_condition(emitter_buffer);
     ...
 }
 ```
 
-从`AlignedBox`的设定来看，入口速度的盒子长度为$$10\Delta L_\mathrm{f}$$，将其平移后，所有$$-2\Delta L_\mathrm{f}\leq y \leq 8\Delta L_\mathrm{f}$$区间内的粒子速度被设置为给定的入口流速。
+从`OrientedBox`的设定来看，入口速度的盒子长度为$$10\Delta L_\mathrm{f}$$，将其平移后，所有$$-2\Delta L_\mathrm{f}\leq y \leq 8\Delta L_\mathrm{f}$$区间内的粒子速度被设置为给定的入口流速。
 
 # 流入边界
 
 ## 定义
 
-流入盒子定义在$$-R\leq x\leq R, 0\leq y \leq 4\Delta L_\mathrm{f}, -R\leq z\leq R$$区间内。它在构造时会从给定的`emitter`（`AlignedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
+流入盒子定义在$$-R\leq x\leq R, 0\leq y \leq 4\Delta L_\mathrm{f}, -R\leq z\leq R$$区间内。它在构造时会从给定的`emitter`（`OrientedBoxByParticle`类型）中读取body信息、粒子信息和获取aligned box，然后将给定的`inlet_particle_buffer`记录为自己的buffer成员，最后确保传入的`inflow_particle_buffer`的`is_particles_reserved_`属性为`true`。
 
 ```cpp
 void poiseuille_flow(...) {
 	const Vec3d emitter_halfsize(fluid_radius, resolution_ref * 2, fluid_radius);
     const Vec3d emitter_translation(0., resolution_ref * 2, 0.);
     ...
-    AlignedBoxByParticle emitter(water_block, AlignedBox(yAxis, Transform(Vec3d(emitter_translation)), emitter_halfsize));
+    OrientedBoxByParticle emitter(water_block, OrientedBox(yAxis, Transform(Vec3d(emitter_translation)), emitter_halfsize));
     SimpleDynamics<fluid_dynamics::EmitterInflowInjection> emitter_inflow_injection(emitter, inlet_particle_buffer);
     ...
 }
 ```
 
-注意这里使用的是emitter是`AlignedBoxByParticle`，而非入口流速指定那里使用的`AlignedBoxByCell`。这两个的区别在于`AlignedBoxByParticle`对象记录的是被构造时`AlignedBox`区域的粒子ID。所以后续遍历时，无论这些粒子是否跑出了`AlignedBox`，都会把这些粒子遍历到。而`AlignedBoxByCell`记录的是cell（CLL中的cell）的ID。后续遍历时，无论粒子初始时是否属于这个cell，只要检测到某个粒子当前在cell里，就会被遍历到。
+注意这里使用的是emitter是`OrientedBoxByParticle`，而非入口流速指定那里使用的`OrientedBoxByCell`。这两个的区别在于`OrientedBoxByParticle`对象记录的是被构造时`OrientedBox`区域的粒子ID。所以后续遍历时，无论这些粒子是否跑出了`OrientedBox`，都会把这些粒子遍历到。而`OrientedBoxByCell`记录的是cell（CLL中的cell）的ID。后续遍历时，无论粒子初始时是否属于这个cell，只要检测到某个粒子当前在cell里，就会被遍历到。
 
-这里给`EmitterInflowInjection`传入的必须是`AlignedBoxByParticle`类型的对象，为什么呢？且看下面流入边界是如何执行的。
+这里给`EmitterInflowInjection`传入的必须是`OrientedBoxByParticle`类型的对象，为什么呢？且看下面流入边界是如何执行的。
 
 ## 执行
 
@@ -277,14 +278,14 @@ void EmitterInflowInjection::update(size_t original_index_i, Real dt)
 
 ## 定义
 
-流出盒子定义在$$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$$区间内。它在构造时会从给定的`disposer`（`AlignedBoxByCell`类型）中读取body信息、粒子信息和获取aligned box。
+流出盒子定义在$$-1.1R\leq x\leq 1.1R, L-4\Delta L_\mathrm{f}\leq y\leq L, -1.1R\leq z\leq 1.1R$$区间内。它在构造时会从给定的`disposer`（`OrientedBoxByCell`类型）中读取body信息、粒子信息和获取aligned box。
 
 ```cpp
 void poiseuille_flow(...) {
     const Vec3d disposer_halfsize(fluid_radius * 1.1, resolution_ref * 2, fluid_radius * 1.1);
     const Vec3d disposer_translation(0., full_length - disposer_halfsize[1], 0.);
     ...
-    AlignedBoxByCell disposer(water_block, AlignedBox(yAxis, Transform(Vec3d(disposer_translation)), disposer_halfsize));
+    OrientedBoxByCell disposer(water_block, OrientedBox(yAxis, Transform(Vec3d(disposer_translation)), disposer_halfsize));
     SimpleDynamics<fluid_dynamics::DisposerOutflowDeletion> disposer_outflow_deletion(disposer);
     ...
 }
@@ -332,7 +333,7 @@ emitter消耗buffer particle，disposer又提供buffer particle，通过buffer p
 
 容易引起困惑的是
 
-1. `AlignedBoxByCell`只遍历box内部的粒子，为什么越界粒子也会被遍历到？
+1. `OrientedBoxByCell`只遍历box内部的粒子，为什么越界粒子也会被遍历到？
 
 2. 为什么这里使用的是while循环，而不是简单的if语句？
 

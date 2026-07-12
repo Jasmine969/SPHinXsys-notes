@@ -54,6 +54,7 @@
   * [SPHinXsys 中用到的标签派发技术](源码剖析/SPHinXsys中用到的标签派发技术.md)
   * [从源码到范式：SPHinXsys的RAII所有权设计与指针策略](源码剖析/从源码到范式：SPHinXsys的RAII所有权设计与指针策略.md)
 * 其他
+	* [SPHinXsys从v1.2.2-sycl到master：API与架构迁移说明](<其他/SPHinXsys从v1.2.2-sycl到master (20260706)：API 与架构迁移说明.md>)
 	* [写了个SPHinXsys的GDB扩展](其他/写了个SPHinXsys的GDB扩展.md)
 	* [geoparticle数据导出到SPHinXsys](其他/geoparticle数据导出到SPHinXsys.md)
 

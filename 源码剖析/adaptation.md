@@ -126,7 +126,7 @@
 该函数的调用链在 `SPHBody::generateParticles()` 中：
 
 - 粒子几何生成完成
-- `particles->initializeBasicParticleVariables()`
+- `particles->initializeBasicDiscreteVariables()`
 - `sph_adaptation_->initializeAdaptationVariables(*particles)`
 
 因此它是“每个 body 的 particle variables”与 adaptation 绑定的关键时机。

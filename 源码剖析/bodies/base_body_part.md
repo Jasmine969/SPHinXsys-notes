@@ -1,6 +1,8 @@
 
 # BodyPart 体系总结（含继承关系/成员/用法）
 
+> 本文按`master@2342419`（2026-07-06）更新。当前`BodyPart`首先描述粒子或cell集合；relation邻域筛选由相应的`TargetParticleMask`机制处理。旧版由`BodyPart`直接写成员身份ID的实现细节不再作为当前通用模型。
+
 本文基于 `src/shared/bodies/base_body_part.h/.cpp` 对 BodyPart 家族做一份“按类索引”的总结，并在末尾保留并完善你原来的 by-cell / by-particle 对比结论。
 
 ## 继承关系（概览）
@@ -12,24 +14,24 @@ BodyPart
 │  ├─ BodyRegionByParticle
 │  ├─ BodySurface
 │  ├─ BodySurfaceLayer
-│  ├─ AlignedBoxByParticle   (同时继承 AlignedBoxPart)
+│  ├─ OrientedBoxByParticle   (同时继承 OrientedBoxPart)
 │  └─ (其它基于粒子的子类)
 ├─ BodyPartByCell
 │  ├─ BodyRegionByCell
 │  ├─ NearShapeSurface
-│  ├─ AlignedBoxByCell       (同时继承 AlignedBoxPart)
+│  ├─ OrientedBoxByCell       (同时继承 OrientedBoxPart)
 │  └─ (其它基于 cell 的子类)
-└─ AlignedBoxPart            (一个“混入”类：保存 aligned_box_)
+└─ OrientedBoxPart            (一个“混入”类：保存 aligned_box_)
 ```
 
-> 说明：`AlignedBoxByParticle/AlignedBoxByCell` 是多重继承：分别继承 `BodyPartByParticle/BodyPartByCell` + `AlignedBoxPart`。
+> 说明：`OrientedBoxByParticle/OrientedBoxByCell` 是多重继承：分别继承 `BodyPartByParticle/BodyPartByCell` + `OrientedBoxPart`。
 
 ## 通用基类：BodyPart
 
 ### 职责
 
 - 为一个 `SPHBody` 定义“body 的某一部分（part）”的公共属性。
-- 维护该 part 的 `part_id_`，并在粒子上建立一个“属于哪个 part”的标记变量（`dv_body_part_id_`）。
+- 描述该part的粒子或cell集合，并向dynamics提供loop range。
 - 提供一个通用的 mask：`TargetParticleMask`（用于“只对属于该 part 的粒子生效”的过滤）。
 
 ### 关键成员变量（核心状态）
@@ -40,8 +42,7 @@ BodyPart
 - `std::string part_name_`：默认名字（`bodyName + "Part" + id`）。
 - `std::optional<std::string> alias_`：可选别名（很多派生类会把 shape名/固定名称写到 alias）。
 - `SPHAdaptation &sph_adaptation_`：便于取 spacing 等信息。
-- `SingularVariable<UnsignedInt> *sv_range_size_`：记录loop range的规模（粒子数或 cell 数，取决于子类）。
-- `DiscreteVariable<int> *dv_body_part_id_`：每个粒子一个int，存它被标记成哪个`part_id_`。
+- `SingleVariable<UnsignedInt> *sv_range_size_`：记录loop range的规模（粒子数或 cell 数，取决于子类）。
 - `Vecd *pos_`：粒子位置指针（来自`Position`）。
 - `UniquePtrsKeeper<Entity> unique_variable_ptrs_`：用于创建 `dv_particle_list_ / dv_cell_list_ / sv_range_size_` 等“只属于该 part 的变量”。
 
@@ -49,11 +50,10 @@ BodyPart
 
 - `BodyPart(SPHBody &sph_body)`：
 	- 分配 `part_id_`。
-	- 注册 `dv_body_part_id_ = registerStateVariable<int>(part_name_ + "ID")`。
 	- 取 `pos_ = getVariableDataByName<Vecd>("Position")`。
-- `std::string getName() const`：优先返回 `alias_`，否则返回 `part_name_`。
+- `std::string Name() const`：优先返回 `alias_`，否则返回 `part_name_`。
 - `BaseCellLinkedList &getCellLinkedList()`：对 `sph_body_` 做 `DynamicCast<RealBody>` 并返回其 cell linked list（因此：不是 `RealBody` 会在这里失败）。
-- `SingularVariable<UnsignedInt> *svRangeSize()`：返回 range size。
+- `SingleVariable<UnsignedInt> *svRangeSize()`：返回 range size。
 
 ### 内嵌模板：TargetParticleMask
 
@@ -78,7 +78,7 @@ class TargetParticleMask : public TargetCriterion
 
 ### 关键点
 
-- `typedef BodyPartByID BaseIdentifier;`：用于把它作为 dynamics 的“标识类型（Identifier）”。
+- `typedef BodyPartByID RangeIdentifier;`：用于把它作为 dynamics 的“标识类型（Identifier）”。
 - 构造时把 `sv_range_size_ = base_particles_.svTotalRealParticles()`，也就是直接用全体粒子数。
 
 ## BodyPartByParticle
@@ -101,7 +101,7 @@ class TargetParticleMask : public TargetCriterion
 - `void setBodyPartBounds(BoundingBox bbox)` / `BoundingBox getBodyPartBounds()`。
 - `void tagParticles(TaggingParticleMethod &method)`：
 	- 遍历 `[0, TotalRealParticles)`，对满足判据的粒子：
-		- `dv_body_part_id_->setValue(i, part_id_)`（写标记）
+		- 将粒子索引加入`body_part_particles_`。
 		- `body_part_particles_.push_back(i)`（收集索引）
 	- 生成 `dv_particle_list_`（长度 = 粒子数，内容 = 粒子索引）。
 	- 生成 `sv_range_size_`（记录粒子数）。
@@ -130,14 +130,14 @@ class TargetParticleMask : public TargetCriterion
 - `size_t SizeOfLoopRange()`：累加每个 cell 内粒子数。
 - `void tagCells(TaggingCellMethod &method)`：
 	- 调用 `cell_linked_list_.tagBodyPartByCell(...)` 筛选出 cell，并填充 `body_part_cells_` 与 `cell_indexes`。
-	- 遍历 `body_part_cells_` 内所有粒子 index：对每个粒子写 `dv_body_part_id_->setValue(particle, part_id_)`。
+	- 保存满足条件的cell；执行时通过cell linked list访问这些cell当前包含的粒子。
 	- 生成 `dv_cell_list_` 与 `sv_range_size_`（此处 size 是 cell 数）。
 
 ## 注意点
 
 `BodyPartByCell`标记的是cell而非particle。cell是比较粗糙的，它的边界不一定和区域边界重合，所以`BodyPartByCell`管理的粒子**可能不在预期的区域之内**。在使用`BodyPartByCell`的时候建议严格检查粒子是否在预期区域之内。
 
-例如`InflowVelocityCondition<...>`使用`AlignedBoxByCell`来遍历粒子，以下是其`update`函数：
+例如`InflowVelocityCondition<...>`使用`OrientedBoxByCell`来遍历粒子，以下是其`update`函数：
 
 ```cpp
     void update(size_t index_i, Real dt = 0.0)
@@ -149,7 +149,7 @@ class TargetParticleMask : public TargetCriterion
     };
 ```
 
-再如`BidirectionalBuffer`的`TagBufferParticles`使用`AlignedBoxByCell`来遍历粒子，以下是其`update`函数：
+再如`BidirectionalBuffer`的`TagBufferParticles`使用`OrientedBoxByCell`来遍历粒子，以下是其`update`函数：
 
 ```cpp
         virtual void update(size_t index_i, Real dt = 0.0)
@@ -161,7 +161,7 @@ class TargetParticleMask : public TargetCriterion
         };
 ```
 
-`BidirectionalBuffer`的`Injection`类使用`AlignedBoxByCell`来遍历粒子，以下是其`update`函数：
+`BidirectionalBuffer`的`Injection`类使用`OrientedBoxByCell`来遍历粒子，以下是其`update`函数：
 
 ```cpp
         void update(size_t index_i, Real dt = 0.0)
@@ -183,7 +183,7 @@ class TargetParticleMask : public TargetCriterion
 	- `Shape &body_part_shape_`
 	- `SharedPtrKeeper<Shape> shape_ptr_keeper_`（当通过 SharedPtr 构造时，用于延长 shape 生命周期）
 - 构造行为：
-	- `alias_ = shape.getName()`
+	- `alias_ = shape.Name()`
 	- `tagParticles( bind(tagByContain) )`
 - 判据：`tagByContain(i) -> shape.checkContain(pos_[i])`
 
@@ -215,7 +215,7 @@ class TargetParticleMask : public TargetCriterion
 	- `Shape &body_part_shape_`
 	- `SharedPtrKeeper<Shape> shape_ptr_keeper_`
 - 构造行为：
-	- `alias_ = shape.getName()`
+	- `alias_ = shape.Name()`
 	- `tagCells( bind(checkNotFar) )`
 - 判据：`checkNotFar(cell_pos, threshold) -> shape.checkNotFar(cell_pos, threshold)`
 
@@ -232,28 +232,28 @@ class TargetParticleMask : public TargetCriterion
 - 构造行为：`tagCells( bind(checkNearSurface) )`
 - 判据：`checkNearSurface(cell_pos, threshold) -> level_set_shape_.checkNearSurface(cell_pos, threshold)`
 
-## AlignedBox*（混入类 + 两个实现）
+## OrientedBox*（混入类 + 两个实现）
 
-### AlignedBoxPart
+### OrientedBoxPart
 
 - 这是一个“存 aligned box 的混入类”，不直接参与粒子/cell 标记。
 - 成员：
-	- `UniquePtrKeeper<SingularVariable<AlignedBox>> sv_aligned_box_keeper_`
-	- `AlignedBox &aligned_box_`（引用到上面 `SingularVariable` 的数据）
+	- `UniquePtrKeeper<SingleVariable<OrientedBox>> sv_aligned_box_keeper_`
+	- `OrientedBox &aligned_box_`（引用到上面 `SingleVariable` 的数据）
 - 函数：
-	- `SingularVariable<AlignedBox> *svAlignedBox()`
-	- `AlignedBox &getAlignedBox()`
+	- `SingleVariable<OrientedBox> *svOrientedBox()`
+	- `OrientedBox &getOrientedBox()`
 
-### AlignedBoxByParticle
+### OrientedBoxByParticle
 
-- 父类：`BodyPartByParticle, AlignedBoxPart`
-- 构造：`AlignedBoxByParticle(real_body, aligned_box)` 后 `tagParticles(bind(tagByContain))`
+- 父类：`BodyPartByParticle, OrientedBoxPart`
+- 构造：`OrientedBoxByParticle(real_body, aligned_box)` 后 `tagParticles(bind(tagByContain))`
 - 判据：`aligned_box_.checkContain(pos_[i])`
 
-### AlignedBoxByCell
+### OrientedBoxByCell
 
-- 父类：`BodyPartByCell, AlignedBoxPart`
-- 构造：`AlignedBoxByCell(real_body, aligned_box)` 后 `tagCells(bind(checkNotFar))`
+- 父类：`BodyPartByCell, OrientedBoxPart`
+- 构造：`OrientedBoxByCell(real_body, aligned_box)` 后 `tagCells(bind(checkNotFar))`
 - 判据：`aligned_box_.checkNotFar(cell_pos, threshold)`
 
 ---
@@ -304,14 +304,14 @@ class TargetParticleMask : public TargetCriterion
 `BodyPartByParticle`：遍历开销是$O(N_\mathrm{part})$，但如果粒子集合需要频繁重建（粒子流动导致集合变化），重建成本可能高。
 `BodyPartByCell`：遍历开销大约是 $O(N_\mathrm{cells~in~region}+N_\mathrm{particles~in~those~cells})$；区域固定时，cell 集合通常相对稳定，而且能很好地跟随 cell linked list 的更新来“自动跟踪”区域内粒子。
 
-# AlignedBoxByParticle和AlignedBoxByCell
+# OrientedBoxByParticle和OrientedBoxByCell
 
-`AlignedBoxByParticle`：
+`OrientedBoxByParticle`：
 
-- 记录的是被构造时`AlignedBox`区域的粒子ID。所以后续遍历时，无论这些粒子是否跑出了`AlignedBox`，都会把这些粒子遍历到。
+- 记录的是被构造时`OrientedBox`区域的粒子ID。所以后续遍历时，无论这些粒子是否跑出了`OrientedBox`，都会把这些粒子遍历到。
 - 用于`EmitterInflowInjection`、`EmitterInflowCondition`。
 
-`AlignedBoxByCell`：
+`OrientedBoxByCell`：
 
 - 记录的是cell的ID。后续遍历时，无论粒子初始时是否属于这个cell，只要检测到粒子当前在cell里，就会被遍历到。
 - 用于`InflowVelocityCondition<...>`、`DisposerOutflowDeletion`

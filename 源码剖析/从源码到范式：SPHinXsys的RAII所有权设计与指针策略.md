@@ -22,24 +22,22 @@
 class SPHBody
 {
   private:
-    UniquePtrKeeper<BaseMaterial> base_material_ptr_keeper_;
+    UniquePtrKeeper<MatterMaterial> matter_keeper_;
+    UniquePtrsKeeper material_properties_keeper_;
   public:
-    BaseMaterial &getBaseMaterial();
-	template <class MaterialType = BaseMaterial, typename... Args>
-    MaterialType *defineMaterial(Args &&...args)
-    {
-        MaterialType *material = base_material_ptr_keeper_.createPtr<MaterialType>(std::forward<Args>(args)...);
-        base_material_ = material;
-        return material;
-    };
+    MatterMaterial &getMatterMaterial();
+	template <class MaterialType, typename... Args>
+    MaterialType &defineMatterMaterial(Args &&...args);
+	template <class PropertyType, typename... Args>
+    PropertyType &addMaterialProperty(Args &&...args);
     ...
 }
 ```
 
-`material`的生存周期是跟着body走的：
+主体材料和附加材料属性的生存周期都跟着body走：
 
-- 生存周期由`base_material_ptr_keeper_`（内部是`unique_ptr`）管理
-- 使用时采用原始指针（`base_material_`）。别的对象需要用到material，都是从`base_material_`访问（`getBaseMaterial`），不会再去涉及`base_material_ptr_keeper_`（而且也访问不到，因为它是私有成员）。
+- 主体材料由`matter_keeper_`管理，通过`getMatterMaterial()`取得非拥有型引用；
+- 多个附加属性由`material_properties_keeper_`管理，通过`getMaterialProperty<T>()`或`collectMaterialProperties<T>()`取得非拥有型引用。
 
 因此“智能指针只在构建时起作用”这句话可以更精确地说：智能指针负责所有权和析构；仿真阶段主要走原始指针路径以降低开销并简化数据访问。这也对应官网那句：
 
@@ -56,7 +54,8 @@ class SPHBody
     SharedPtrKeeper<Shape> shape_ptr_keeper_;
     UniquePtrKeeper<SPHAdaptation> sph_adaptation_ptr_keeper_;
     UniquePtrKeeper<BaseParticles> base_particles_ptr_keeper_;
-    UniquePtrKeeper<BaseMaterial> base_material_ptr_keeper_;
+    UniquePtrKeeper<MatterMaterial> matter_keeper_;
+    UniquePtrsKeeper material_properties_keeper_;
     ...
 }
 ```

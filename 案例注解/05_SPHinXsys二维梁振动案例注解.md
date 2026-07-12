@@ -22,7 +22,7 @@ int main(...)
 	//	Creating body, materials and particles.
     //----------------------------------------------------------------------
     SolidBody beam_body(sph_system, makeShared<Beam>("BeamBody"));
-    beam_body.defineMaterial<SaintVenantKirchhoffSolid>(rho0_s, Youngs_modulus, poisson);
+    beam_body.defineMatterMaterial<SaintVenantKirchhoffSolid>(rho0_s, Youngs_modulus, poisson);
     beam_body.generateParticles<BaseParticles, Lattice>();
     ...
 }
@@ -61,7 +61,7 @@ class BeamInitialCondition
   public:
     explicit BeamInitialCondition(SPHBody &sph_body)
         : solid_dynamics::ElasticDynamicsInitialCondition(sph_body),
-          elastic_solid_(DynamicCast<ElasticSolid>(this, sph_body_->getBaseMaterial())) {};
+          elastic_solid_(DynamicCast<ElasticSolid>(this, sph_body_->getMatterMaterial())) {};
 
     void update(size_t index_i, Real dt)
     {
@@ -88,7 +88,7 @@ int main(...)
 }
 ```
 
-`solid_dynamics::ElasticDynamicsInitialCondition`其实就是个空壳子，和`fluid_dynamics::FluidInitialCondition`除了名字不一样其他都一样。用户需要自定义`update`函数。它继承于`LocalDynamics`，当用户在构造时传入`sph_body`时，就会赋给`LocalDynamics`的`sph_body_`成员，相当于接管了这个body。在速度场的定义中，我们要用到固体的参考声速。但是无法直接从`sph_body_`获取，因为`getBaseMaterial()`返回的是基类`BaseMaterial`的对象，而`BaseMaterial`并未定义`ReferenceSoundSpeed`方法。因此我们需要将返回的`BaseMaterial`对象经`DynamicCast`转换为`ElasticSolid`对象，后者定义了`ReferenceSoundSpeed`方法。
+`solid_dynamics::ElasticDynamicsInitialCondition`其实就是个空壳子，和`fluid_dynamics::FluidInitialCondition`除了名字不一样其他都一样。用户需要自定义`update`函数。它继承于`LocalDynamics`，当用户在构造时传入`sph_body`时，就会赋给`LocalDynamics`的`sph_body_`成员。在速度场的定义中需要用到固体参考声速。`getMatterMaterial()`返回主体材料的基类引用，而该基类没有定义`ReferenceSoundSpeed`，因此要通过`DynamicCast`取得实际的`ElasticSolid`引用，再调用其接口。
 
 因为`BeamInitialCondition`只定义了`update`函数，所以只需用`SimpleDynamics`接管这个动力学。在求解开始之前执行一次即可。
 
