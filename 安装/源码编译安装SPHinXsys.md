@@ -163,6 +163,7 @@ cmake   -G "Unix Makefiles"                                                     
         -D CMAKE_TOOLCHAIN_FILE="/data/software/sphinxsys-soft/vcpkg/scripts/buildsystems/vcpkg.cmake"      \
         -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache   \
         -D CMAKE_CXX_FLAGS="-Wno-error=maybe-uninitialized"							\
+        -D SPHINXSYS_BUILD_USER_EXAMPLES=ON											\
         -S .                                                                        \
         -B ./build-release-cpu
 # SYCL
@@ -176,15 +177,18 @@ cmake -G "Unix Makefiles" \
       -D CMAKE_C_COMPILER_LAUNCHER=ccache \
       -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
       -D SPHINXSYS_USE_SYCL=ON \
+      -D SPHINXSYS_BUILD_USER_EXAMPLES=OFF											\
       -D SPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda \
-      -D SPHINXSYS_BUILD_USER_EXAMPLES=ON \
+      -D SPHINXSYS_USE_ONEDPL_SORTING=OFF \
       -DCMAKE_PREFIX_PATH="/opt/yaml-cpp-0.9.0" \
       -S . \
       -B ./build-sycl-release
 make -j44 # 不建议占用全部核心
 ```
 
-## 测试
+注意：编译SYCL版本时，user_examples只能编译SYCL版本的。SYCL并没有extra_sources（如bidirectional_buffer.h）。但是SYCL实现了自己的双向buffer（`fluid_dynamics::BidirectionalBoundaryCK`）。
+
+## 测试。
 
 ```bash
 # run the whole test suite
