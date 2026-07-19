@@ -183,6 +183,24 @@ cmake -G "Unix Makefiles" \
       -DCMAKE_PREFIX_PATH="/opt/yaml-cpp-0.9.0" \
       -S . \
       -B ./build-sycl-release
+      
+cmake -G "Unix Makefiles" \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_C_COMPILER=icx \
+      -D CMAKE_CXX_COMPILER=icpx \
+      -D CMAKE_C_FLAGS="--gcc-install-dir=$GCC12_DIR" \
+      -D CMAKE_CXX_FLAGS="--gcc-install-dir=$GCC12_DIR -Wno-error=maybe-uninitialized -Wno-tautological-constant-compare" \
+      -D CMAKE_TOOLCHAIN_FILE="/data/software/sphinxsys-soft/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+      -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+      -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+      -D SPHINXSYS_USE_SYCL=ON \
+      -D SPHINXSYS_BUILD_USER_EXAMPLES=OFF											\
+      -D SPHINXSYS_SYCL_TARGETS=nvptx64-nvidia-cuda \
+      -D SPHINXSYS_USE_ONEDPL_SORTING=ON \
+      -DCMAKE_PREFIX_PATH="/opt/yaml-cpp-0.9.0" \
+      -S . \
+      -B ./build-sycl-onedpl
+      
 make -j44 # 不建议占用全部核心
 ```
 
