@@ -2,7 +2,7 @@
 
 前七课已经分别介绍了 SYCL 的执行模型，以及 SPHinXsys 中的 `par_host`、`par_ck`、`DiscreteVariable`、`DelegatedData()` 和 `UpdateKernel`。本课不再逐个解释这些概念，而是沿着一条真实源码调用链，把它们重新连接起来。
 
-本课选择二维溃坝案例中的重力 Dynamics：
+本课选择二维溃坝案例（`tests\tests_sycl\2d_examples\test_2d_dambreak_sycl\dambreak_sycl.cpp`）中的重力 Dynamics：
 
 ```cpp
 Gravity gravity(Vecd(0.0, -gravity_g));
@@ -216,21 +216,17 @@ class GravityForceCK
 template <class GravityType>
 template <typename... Args>
 GravityForceCK<GravityType>::GravityForceCK(
-    SPHBody &sph_body,
-    Args &&...args)
+    SPHBody &sph_body, Args &&...args)
     : LocalDynamics(sph_body),
       ForcePriorCK(
-          this->particles_,
-          "GravityForceCK"),
+          this->particles_, "GravityForceCK"),
       gravity_(std::forward<Args>(args)...),
       sv_physical_time_(
           &sph_system_->svPhysicalTime()),
       dv_pos_(
-          particles_->getVariableByName<Vecd>(
-              "Position")),
+          particles_->getVariableByName<Vecd>("Position")),
       dv_mass_(
-          particles_->getVariableByName<Real>(
-              "Mass"))
+          particles_->getVariableByName<Real>("Mass"))
 {
 }
 ```
@@ -251,9 +247,7 @@ ForcePriorCK::ForcePriorCK(
     const std::string &force_name)
     : ForcePriorCK(
           particles,
-          particles
-              ->registerStateVariable<Vecd>(
-                  force_name))
+          particles->registerStateVariable<Vecd>(force_name))
 {
 }
 ```
@@ -372,8 +366,7 @@ void GravityForceCK<GravityType>::
     this->current_force_[index_i] =
         mass_[index_i] *
         gravity_.InducedAcceleration(
-            pos_[index_i],
-            *physical_time_);
+            pos_[index_i], *physical_time_);
 
     ForcePriorCK::UpdateKernel::update(
         index_i, dt);
@@ -505,13 +498,13 @@ void exec(Real dt = 0.0) override
 
 ## 6.1 准备 Computing Kernel
 
-`getComputingKernel()` 会先在 Host 上构造临时 `UpdateKernel`。构造过程中，所有 `DelegatedData(ex_policy)` 都已经根据执行策略选好了数据地址。
+`getComputingKernel()` 会先在 Host 上构造 `UpdateKernel`，由 `kernel_keeper_` 持有。构造过程中，所有 `DelegatedData(ex_policy)` 都已经根据执行策略选好了数据地址。
 
 当 Execution Policy 是 Device Policy 时，`Implementation` 会：
 
 1. 在 Device 上为一个 `UpdateKernel` 对象分配空间；
-2. 在 Host 上构造临时 `UpdateKernel`；
-3. 将该对象复制到 Device；
+2. 创建并由 `kernel_keeper_` 持有一个 Host 侧 `UpdateKernel`；
+3. 将 Host 侧对象的内容复制到 Device；
 4. 返回 Device 上的 `UpdateKernel*`。
 
 因此，传给 SYCL Kernel 的 `update_kernel` 不是指向普通 Host 对象的指针，而是 Device 可访问的 Computing Kernel 指针。
@@ -526,17 +519,7 @@ svTotalRealParticles()
 
 取得真实粒子总数。
 
-对于完整 `SPHBody`：
-
-```cpp
-computeUnit(f, i)
-```
-
-只是直接执行：
-
-```cpp
-f(i);
-```
+对于完整 `SPHBody`，`computeUnit(f, i)`只是直接执行`f(i)`。
 
 因此，这里的逻辑循环编号就是实际粒子编号：
 
@@ -562,22 +545,17 @@ sycl_queue.submit(
     [&](sycl::handler &cgh)
     {
         cgh.parallel_for(
-            execution_instance
-                .getUniformNdRange(
-                    loop_bound),
+            execution_instance.getUniformNdRange(loop_bound),
             [=](sycl::nd_item<1> item)
             {
-                if (
-                    item.get_global_id(0) <
-                    loop_bound)
+                if (item.get_global_id(0) < loop_bound)
                 {
                     loop_range.computeUnit(
                         unary_func,
                         item.get_global_id(0));
                 }
             });
-    })
-    .wait_and_throw();
+    }).wait_and_throw();
 ```
 
 `getUniformNdRange()` 会把全局范围向上补齐为局部范围的整数倍。例如真实粒子数为 1000、局部大小为 64 时，全局范围会补齐到 1024。因此 Kernel 中必须检查：
@@ -760,79 +738,11 @@ auto &constant_gravity =
 
 进行 Host 与 Device 对比时，不要在同一次模拟中先后执行两个 `constant_gravity` 对象，否则二者会共同修改同一组状态变量。更稳妥的做法是分别编译或运行两个版本，再比较输出。
 
-# 8. 修改、调试与验证练习
+# 8. 常见问题定位
 
-读懂一个 Dynamics 后，最有效的巩固方式不是继续阅读更多模板，而是做一次小修改，并完整验证 Host 与 Device 路径。
+## 8.1 Host CK 可以编译，Device CK编译失败，
 
-## 8.1 练习：为重力增加缩放系数
-
-可以在外层类中增加：
-
-```cpp
-Real gravity_scale_;
-```
-
-并在 `UpdateKernel` 中增加同名成员。构造 `UpdateKernel` 时复制该值：
-
-```cpp
-gravity_scale_(
-    encloser.gravity_scale_)
-```
-
-随后把计算改为：
-
-```cpp
-this->current_force_[index_i] =
-    gravity_scale_ *
-    mass_[index_i] *
-    gravity_.InducedAcceleration(
-        pos_[index_i],
-        *physical_time_);
-```
-
-这个修改很适合作为第一个自定义 CK Dynamics 练习，因为它：
-
-- 不需要新增粒子数组；
-- 不涉及邻居循环；
-- 不涉及原子操作；
-- Host 与 Device 应得到相同结果；
-- 能检查你是否理解外层成员与 Kernel 成员的区别。
-
-## 8.2 推荐验证顺序
-
-第一步先用 `host_methods` 创建修改后的 CK Dynamics。Host CK 路径更容易使用普通 CPU 调试器逐步检查 `update()`。
-
-第二步用一个或少量粒子做解析检查。例如：
-
-\[
-m=2,\qquad
-\boldsymbol{g}=(0,-9.81),\qquad
-s=0.5
-\]
-
-则期望得到：
-
-\[
-\boldsymbol{F}_g
-=
-s\,m\boldsymbol{g}
-=
-(0,-9.81)
-\]
-
-第三步连续执行两次相同的重力 Dynamics，确认 `ForcePrior` 不会变成两倍。这个检查可以验证 `current_force - previous_force` 的逻辑是否仍然正确。
-
-第四步切换到 `main_methods`，使用 SYCL Device 路径运行同一问题，并比较：
-
-- `GravityForceCK`；
-- `PreviousGravityForceCK`；
-- `ForcePrior`。
-
-第五步扩大粒子规模，再运行单元测试或回归测试。数值误差应根据数据类型、计算顺序和测试目标设置合理容差，而不是简单要求所有位完全一致。
-
-## 8.3 常见问题定位
-
-若 Host CK 可以编译，而 Device CK 编译失败，应优先检查 `UpdateKernel` 及其成员是否包含：
+优先检查 `UpdateKernel` 及其成员是否包含：
 
 - 虚函数对象；
 - Host-only 指针；
@@ -841,7 +751,9 @@ s\,m\boldsymbol{g}
 - 未验证可在 Device 上调用的第三方函数；
 - 无法复制到 Device 的自定义类型。
 
-若程序能编译但运行时报内存错误，应检查：
+## 8.2 程序能编译但运行时报内存错误
+
+检查
 
 - 是否通过 `DelegatedData(ex_policy)` 取得数据；
 - 指针指向的变量是否仍然存活；
@@ -849,17 +761,20 @@ s\,m\boldsymbol{g}
 - `index_i` 是否可能越界；
 - Host 和 Device 数据是否在需要时完成同步。
 
-若 Host 与 Device 数值不同，应先缩小到少量粒子，并逐步检查：
+## 8.3 Host 与 Device 数值不同
+
+应先缩小到少量粒子，并逐步检查：
 
 1. 初始变量是否一致；
 2. `UpdateKernel` 得到的成员值是否一致；
 3. 单个粒子的 `update()` 是否一致；
-4. 多次执行时 `previous_force_` 是否正确更新；
 5. 前后 Dynamics 的执行顺序是否一致。
 
-若出现 Work-group 大小、寄存器或 `nd_range` 错误，应把问题与物理公式分开分析。`update()` 数学正确并不代表某个局部大小一定适合目标设备。
+## 8.4 Work-group 大小、寄存器或 `nd_range` 错误
 
-## 8.4 本课总结
+应把问题与物理公式分开分析。`update()` 数学正确并不代表某个局部大小一定适合目标设备。
+
+## 9. 本课总结
 
 阅读一个 SPHinXsys SYCL Dynamics 时，可以固定按照下面的顺序追踪：
 

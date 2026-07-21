@@ -14,6 +14,7 @@
     * [几何创建](用户指南/几何创建.md)
     * [指定物体运动或变形](用户指南/指定物体运动或变形.md)
     * [施加外力](用户指南/施加外力.md)
+    * [执行策略：并行、串行、CPU、GPU？](用户指南/执行策略：并行、串行、CPU、GPU？.md)
     * [如何在精确的时间步输出粒子信息到VTP文件](用户指南/如何在精确的时间步输出粒子信息到VTP文件.md)
 * [算法](算法/算法.md)
     * [边界截断问题的解决](算法/边界截断问题的解决.md)
@@ -32,6 +33,8 @@
   	* [base_particles](源码剖析/particles/base_particles.md)
   * [particle_dynamics](源码剖析/particle_dynamics.md)
   	* [dynamic algorithm](源码剖析/particle_dynamics/dynamic_algorithms.md)
+  	* execution
+  	  - [execution_policy](源码剖析/particle_dynamics/execution/execution_policy.md)
   	* [fluid_dynamics](源码剖析/particle_dynamics/fluid_dynamics.md)
   	  * [density summation](源码剖析/particle_dynamics/fluid_dynamics/density_summation.md)
   	  * [fluid boundary](源码剖析/particle_dynamics/fluid_dynamics/fluid_boundary.md)
